@@ -609,7 +609,6 @@ else:
             st.warning("Données mémoire non disponibles ou filtrées à vide.")
 
     elif st.session_state.current_section == "Transactions Utilisateurs":
-       elif st.session_state.current_section == "Analyse des Utilisateurs":
         # --- Onglet 2: Transactions Utilisateurs (USERTCODE_cleaned.xlsx) ---
         st.header("👤 Analyse des Transactions Utilisateurs")
         df_user = dfs['usertcode'].copy()
@@ -625,32 +624,21 @@ else:
                 st.warning("La colonne 'TASKTYPE' est manquante dans les données utilisateurs pour le filtrage.")
 
         if not df_user.empty:
-            st.subheader("Temps de Réponse Moyen par Type de Tâche (RESPTI)")
+            st.subheader("Top Types de Tâches (TASKTYPE) par Temps de Réponse Moyen")
             if 'TASKTYPE' in df_user.columns and 'RESPTI' in df_user.columns and df_user['RESPTI'].sum() > 0:
                 # Ensure RESPTI is numeric before aggregation
                 df_user['RESPTI'] = pd.to_numeric(df_user['RESPTI'], errors='coerce').fillna(0).astype(float)
-                
-                # Calculer le temps de réponse moyen pour CHAQUE type de tâche
-                # et trier du plus élevé au plus bas pour une meilleure lisibilité
-                avg_tasktype_resp = df_user.groupby('TASKTYPE', as_index=False)['RESPTI'].mean().sort_values(by='RESPTI', ascending=False)
-                
-                if not avg_tasktype_resp.empty and avg_tasktype_resp['RESPTI'].sum() > 0:
-                    fig_avg_tasktype_resp = px.bar(avg_tasktype_resp,
-                                                   x='RESPTI', # Mettre RESPTI sur l'axe X pour un graphique à barres horizontal
-                                                   y='TASKTYPE', # Mettre TASKTYPE sur l'axe Y
-                                                   orientation='h', # Orientation horizontale pour les barres
-                                                   title="Temps de Réponse Moyen (ms) par Type de Tâche (classé)",
-                                                   labels={'RESPTI': 'Temps de Réponse Moyen (ms)', 'TASKTYPE': 'Type de Tâche'},
-                                                   color='RESPTI', # Coloration basée sur le temps de réponse
-                                                   color_continuous_scale=px.colors.sequential.Cividis,
-                                                   height=max(500, len(avg_tasktype_resp) * 30)) # Ajuster la hauteur dynamiquement
-                    
-                    # Pour assurer un affichage clair, trier l'axe Y
-                    fig_avg_tasktype_resp.update_yaxes(categoryorder='total ascending') # Or 'total descending' if you want highest at top
-                    
-                    st.plotly_chart(fig_avg_tasktype_resp, use_container_width=True)
+                temp_top_tasktype_resp = df_user.groupby('TASKTYPE', as_index=False)['RESPTI'].mean().nlargest(10, 'RESPTI')
+                if not temp_top_tasktype_resp.empty and temp_top_tasktype_resp['RESPTI'].sum() > 0:
+                    fig_top_tasktype_resp = px.bar(temp_top_tasktype_resp,
+                                                x='TASKTYPE',
+                                                y='RESPTI',
+                                                title="Top 10 Types de Tâches par Temps de Réponse Moyen",
+                                                labels={'RESPTI': 'Temps de Réponse Moyen (ms)', 'TASKTYPE': 'Type de Tâche'},
+                                                color='RESPTI', color_continuous_scale=px.colors.sequential.Cividis)
+                    st.plotly_chart(fig_top_tasktype_resp, use_container_width=True)
                 else:
-                    st.info("Pas de données valides pour le Temps de Réponse Moyen par Type de Tâche après filtrage.")
+                    st.info("Pas de données valides pour les Top Types de Tâches par Temps de Réponse Moyen après filtrage.")
             else:
                 st.info("Colonnes 'TASKTYPE' ou 'RESPTI' manquantes ou RESPTI total est zéro/vide après filtrage.")
 
