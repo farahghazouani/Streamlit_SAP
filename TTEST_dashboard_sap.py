@@ -608,7 +608,7 @@ else:
         else:
             st.warning("Données mémoire non disponibles ou filtrées à vide.")
 
-    👤 Analyse des Transactions Utilisateurs
+     Analyse des Transactions Utilisateurs
             st.subheader("Nombre de Transactions par Utilisateur (Top 10)")
             if "usertcode" in dfs and not dfs["usertcode"].empty:
                 df_usertcode = dfs["usertcode"].copy()
