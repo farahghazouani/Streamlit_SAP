@@ -611,36 +611,72 @@ else:
     elif st.session_state.current_section == "Transactions Utilisateurs":
         # --- Onglet 2: Transactions Utilisateurs (USERTCODE_cleaned.xlsx) ---
         st.header("👤 Analyse des Transactions Utilisateurs")
-        df_user = dfs['usertcode'].copy()
-        if selected_accounts:
-            if 'ACCOUNT' in df_user.columns:
-                df_user = df_user[df_user['ACCOUNT'].isin(selected_accounts)]
-            else:
-                st.warning("La colonne 'ACCOUNT' est manquante dans les données utilisateurs pour le filtrage.")
-        if selected_tasktypes:
-            if 'TASKTYPE' in df_user.columns:
-                df_user = df_user[df_user['TASKTYPE'].isin(selected_tasktypes)]
-            else:
-                st.warning("La colonne 'TASKTYPE' est manquante dans les données utilisateurs pour le filtrage.")
+df_user = dfs['usertcode'].copy()
 
-        if not df_user.empty:
-            st.subheader("Top Types de Tâches (TASKTYPE) par Temps de Réponse Moyen")
-            if 'TASKTYPE' in df_user.columns and 'RESPTI' in df_user.columns and df_user['RESPTI'].sum() > 0:
-                # Ensure RESPTI is numeric before aggregation
-                df_user['RESPTI'] = pd.to_numeric(df_user['RESPTI'], errors='coerce').fillna(0).astype(float)
-                temp_top_tasktype_resp = df_user.groupby('TASKTYPE', as_index=False)['RESPTI'].mean().nlargest(10, 'RESPTI')
-                if not temp_top_tasktype_resp.empty and temp_top_tasktype_resp['RESPTI'].sum() > 0:
-                    fig_top_tasktype_resp = px.bar(temp_top_tasktype_resp,
-                                                x='TASKTYPE',
-                                                y='RESPTI',
-                                                title="Top 10 Types de Tâches par Temps de Réponse Moyen",
-                                                labels={'RESPTI': 'Temps de Réponse Moyen (ms)', 'TASKTYPE': 'Type de Tâche'},
-                                                color='RESPTI', color_continuous_scale=px.colors.sequential.Cividis)
-                    st.plotly_chart(fig_top_tasktype_resp, use_container_width=True)
-                else:
-                    st.info("Pas de données valides pour les Top Types de Tâches par Temps de Réponse Moyen après filtrage.")
+# --- Filtrage existant ---
+if selected_accounts:
+    if 'ACCOUNT' in df_user.columns:
+        df_user = df_user[df_user['ACCOUNT'].isin(selected_accounts)]
+    else:
+        st.warning("La colonne 'ACCOUNT' est manquante dans les données utilisateurs pour le filtrage.")
+if selected_tasktypes:
+    if 'TASKTYPE' in df_user.columns:
+        df_user = df_user[df_user['TASKTYPE'].isin(selected_tasktypes)]
+    else:
+        st.warning("La colonne 'TASKTYPE' est manquante dans les données utilisateurs pour le filtrage.")
+
+# --- Début de la visualisation du temps de réponse moyen par TASKTYPE ---
+if not df_user.empty:
+    st.subheader("Distribution du Temps de Réponse Moyen par Type de Tâche")
+
+    if 'TASKTYPE' in df_user.columns and 'RESPTI' in df_user.columns:
+        # Assurez-vous que RESPTI est numérique, gère les non-numériques et les remplace par 0 (ou supprime les lignes si NaN)
+        df_user['RESPTI'] = pd.to_numeric(df_user['RESPTI'], errors='coerce').fillna(0) # Remplacer NaN par 0
+        df_user = df_user[df_user['RESPTI'] > 0] # Optionnel: Supprimer les entrées avec RESPTI <= 0 si elles n'ont pas de sens
+
+        if not df_user.empty and df_user['RESPTI'].sum() > 0:
+            # Calcul du temps de réponse moyen par TASKTYPE
+            # La colonne à aggréger est 'RESPTI', pas 'COUNT'
+            df_avg_response_time = df_user.groupby('TASKTYPE', as_index=False)['RESPTI'].mean()
+            df_avg_response_time.rename(columns={'RESPTI': 'Average_Response_Time'}, inplace=True)
+
+            # --- Logique de regroupement des petites tranches (comme dans votre exemple) ---
+            total_response_time_sum = df_avg_response_time['Average_Response_Time'].sum()
+            min_avg_resp_for_pie = total_response_time_sum * 0.01 # Regrouper si moins de 1% du total
+            
+            significant_tasks_avg_resp = pd.DataFrame() # Initialiser comme DataFrame vide
+            other_tasks_avg_resp = 0
+
+            if not df_avg_response_time.empty:
+                significant_tasks_avg_resp = df_avg_response_time[df_avg_response_time['Average_Response_Time'] >= min_avg_resp_for_pie]
+                other_tasks_avg_resp = df_avg_response_time[df_avg_response_time['Average_Response_Time'] < min_avg_resp_for_pie]['Average_Response_Time'].sum()
+
+            if other_tasks_avg_resp > 0:
+                significant_tasks_avg_resp = pd.concat([significant_tasks_avg_resp, 
+                                                        pd.DataFrame([{'TASKTYPE': 'Autres Petites Tâches', 'Average_Response_Time': other_tasks_avg_resp}])])
+
+            # --- Création du graphique en cercle (Donut Chart) ---
+            if not significant_tasks_avg_resp.empty and significant_tasks_avg_resp['Average_Response_Time'].sum() > 0:
+                fig_resp_dist = px.pie(significant_tasks_avg_resp,
+                                        values='Average_Response_Time',
+                                        names='TASKTYPE',
+                                        title="Pourcentage du Temps de Réponse Moyen par Type de Tâche",
+                                        hole=0.3, # Crée un graphique en forme de donut
+                                        color_discrete_sequence=px.colors.sequential.RdBu) # Utilise la même palette que votre exemple
+
+                fig_resp_dist.update_traces(textposition='inside', textinfo='percent+label',
+                                            marker=dict(line=dict(color='#000000', width=1))) # Bordure noire
+                fig_resp_dist.update_layout(showlegend=True, title_font_size=20)
+
+                st.plotly_chart(fig_resp_dist, use_container_width=True)
             else:
-                st.info("Colonnes 'TASKTYPE' ou 'RESPTI' manquantes ou RESPTI total est zéro/vide après filtrage.")
+                st.info("Pas de données valides pour la distribution du Temps de Réponse Moyen par Type de Tâche après regroupement.")
+        else:
+            st.info("Pas de données valides de Temps de Réponse (RESPTI) après filtrage pour générer le graphique.")
+    else:
+        st.warning("Colonnes 'TASKTYPE' ou 'RESPTI' manquantes pour l'analyse du temps de réponse.")
+else:
+    st.info("Aucune donnée disponible pour l'Analyse des Transactions Utilisateurs après les filtres initiaux.")
 
             st.subheader("Nombre de Transactions par Utilisateur (Top 10)")
             if "usertcode" in dfs and not dfs["usertcode"].empty:
