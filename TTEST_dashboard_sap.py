@@ -608,7 +608,40 @@ else:
         else:
             st.warning("Données mémoire non disponibles ou filtrées à vide.")
 
-     Analyse des Transactions Utilisateurs
+    elif st.session_state.current_section == "Transactions Utilisateurs":
+        # --- Onglet 2: Transactions Utilisateurs (USERTCODE_cleaned.xlsx) ---
+        st.header("👤 Analyse des Transactions Utilisateurs")
+        df_user = dfs['usertcode'].copy()
+        if selected_accounts:
+            if 'ACCOUNT' in df_user.columns:
+                df_user = df_user[df_user['ACCOUNT'].isin(selected_accounts)]
+            else:
+                st.warning("La colonne 'ACCOUNT' est manquante dans les données utilisateurs pour le filtrage.")
+        if selected_tasktypes:
+            if 'TASKTYPE' in df_user.columns:
+                df_user = df_user[df_user['TASKTYPE'].isin(selected_tasktypes)]
+            else:
+                st.warning("La colonne 'TASKTYPE' est manquante dans les données utilisateurs pour le filtrage.")
+
+        if not df_user.empty:
+            st.subheader("Top Types de Tâches (TASKTYPE) par Temps de Réponse Moyen")
+            if 'TASKTYPE' in df_user.columns and 'RESPTI' in df_user.columns and df_user['RESPTI'].sum() > 0:
+                # Ensure RESPTI is numeric before aggregation
+                df_user['RESPTI'] = pd.to_numeric(df_user['RESPTI'], errors='coerce').fillna(0).astype(float)
+                temp_top_tasktype_resp = df_user.groupby('TASKTYPE', as_index=False)['RESPTI'].mean().nlargest(10, 'RESPTI')
+                if not temp_top_tasktype_resp.empty and temp_top_tasktype_resp['RESPTI'].sum() > 0:
+                    fig_top_tasktype_resp = px.bar(temp_top_tasktype_resp,
+                                                x='TASKTYPE',
+                                                y='RESPTI',
+                                                title="Top 10 Types de Tâches par Temps de Réponse Moyen",
+                                                labels={'RESPTI': 'Temps de Réponse Moyen (ms)', 'TASKTYPE': 'Type de Tâche'},
+                                                color='RESPTI', color_continuous_scale=px.colors.sequential.Cividis)
+                    st.plotly_chart(fig_top_tasktype_resp, use_container_width=True)
+                else:
+                    st.info("Pas de données valides pour les Top Types de Tâches par Temps de Réponse Moyen après filtrage.")
+            else:
+                st.info("Colonnes 'TASKTYPE' ou 'RESPTI' manquantes ou RESPTI total est zéro/vide après filtrage.")
+
             st.subheader("Nombre de Transactions par Utilisateur (Top 10)")
             if "usertcode" in dfs and not dfs["usertcode"].empty:
                 df_usertcode = dfs["usertcode"].copy()
