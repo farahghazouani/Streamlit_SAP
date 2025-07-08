@@ -610,108 +610,37 @@ else:
 
     elif st.session_state.current_section == "Transactions Utilisateurs":
         # --- Onglet 2: Transactions Utilisateurs (USERTCODE_cleaned.xlsx) ---
-        st.header("Analyse des Transactions Utilisateurs")
-
-# Utilisation de st.container pour regrouper visuellement cette section
-with st.container(border=True): # Ajoute une bordure visuelle autour de cette section
-    st.markdown("### Aperçu des Données Filtrées et Analyse par Type de Tâche")
-
-    df_user_original = dfs['usertcode'].copy() # Garder une copie de l'original
-    df_user_filtered = df_user_original.copy() # Travailler sur une copie pour le filtrage
-
-    # Variables pour suivre l'état des filtres
-    account_filter_applied = False
-    tasktype_filter_applied = False
-
-    # Filtre par 'ACCOUNT'
-    if selected_accounts:
-        if 'ACCOUNT' in df_user_filtered.columns:
-            initial_rows_account = len(df_user_filtered)
-            df_user_filtered = df_user_filtered[df_user_filtered['ACCOUNT'].isin(selected_accounts)]
-            if not df_user_filtered.empty:
-                st.info(f"Filtre 'ACCOUNT' appliqué. Nombre d'enregistrements réduits de {initial_rows_account} à {len(df_user_filtered)}.")
-                account_filter_applied = True
+        st.header("👤 Analyse des Transactions Utilisateurs")
+        df_user = dfs['usertcode'].copy()
+        if selected_accounts:
+            if 'ACCOUNT' in df_user.columns:
+                df_user = df_user[df_user['ACCOUNT'].isin(selected_accounts)]
             else:
-                st.warning("Aucun enregistrement trouvé après l'application du filtre 'ACCOUNT'.")
-        else:
-            st.error("La colonne 'ACCOUNT' est introuvable pour le filtrage. Veuillez vérifier vos données.")
-            selected_accounts = []
-
-    # Filtre par 'TASKTYPE'
-    if selected_tasktypes:
-        if 'TASKTYPE' in df_user_filtered.columns:
-            initial_rows_tasktype = len(df_user_filtered)
-            df_user_filtered = df_user_filtered[df_user_filtered['TASKTYPE'].isin(selected_tasktypes)]
-            if not df_user_filtered.empty:
-                st.info(f"Filtre 'TASKTYPE' appliqué. Nombre d'enregistrements réduits de {initial_rows_tasktype} à {len(df_user_filtered)}.")
-                tasktype_filter_applied = True
+                st.warning("La colonne 'ACCOUNT' est manquante dans les données utilisateurs pour le filtrage.")
+        if selected_tasktypes:
+            if 'TASKTYPE' in df_user.columns:
+                df_user = df_user[df_user['TASKTYPE'].isin(selected_tasktypes)]
             else:
-                st.warning("Aucun enregistrement trouvé après l'application du filtre 'TASKTYPE'.")
-        else:
-            st.error("La colonne 'TASKTYPE' est introuvable pour le filtrage. Veuillez vérifier vos données.")
-            selected_tasktypes = []
+                st.warning("La colonne 'TASKTYPE' est manquante dans les données utilisateurs pour le filtrage.")
 
-    # --- Présentation des métriques clés après filtrage (conservée pour l'information générale) ---
-    st.markdown("---") # Séparateur visuel
-
-    if df_user_filtered.empty:
-        st.write("Aucune donnée disponible après l'application des filtres. Ajustez vos sélections.")
-    else:
-        total_transactions = len(df_user_filtered)
-        unique_users = df_user_filtered['USER'].nunique() if 'USER' in df_user_filtered.columns else "N/A"
-        unique_tasktypes = df_user_filtered['TASKTYPE'].nunique() if 'TASKTYPE' in df_user_filtered.columns else "N/A"
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric(label="Nombre Total de Transactions", value=total_transactions)
-        with col2:
-            st.metric(label="Utilisateurs Uniques", value=unique_users)
-        with col3:
-            st.metric(label="Types de Tâches Uniques", value=unique_tasktypes)
-
-        st.markdown("---") # Nouveau séparateur avant le graphique
-
-        # --- Nouvelle Visualisation : Cercle de Temps de Réponse Moyen par TASKTYPE ---
-        st.subheader("Distribution du Temps de Réponse Moyen par Type de Tâche")
-
-        # 1. Vérifiez la présence des colonnes nécessaires
-        required_cols_for_pie = ['TASKTYPE', 'RESPTI']
-
-        if 'TASKTYPE' in df_user_filtered.columns and 'RESPTI' in df_user_filtered.columns:
-            # Assurez-vous que 'RESPTI' est numérique, gère les non-numériques si nécessaire
-            df_user_filtered['RESPTI'] = pd.to_numeric(df_user_filtered['RESPTI'], errors='coerce')
-            df_user_filtered.dropna(subset=['RESPTI'], inplace=True) # Supprime les lignes où RESPTI n'est pas un nombre valide
-
-            # 2. Calcul du temps de réponse moyen par TASKTYPE
-            df_avg_response_time = df_user_filtered.groupby('TASKTYPE')['RESPTI'].mean().reset_index()
-            df_avg_response_time.rename(columns={'RESPTI': 'Average_Response_Time'}, inplace=True)
-
-            # 3. Création du graphique en secteurs (Pie Chart) avec Plotly Express
-            if not df_avg_response_time.empty:
-                fig = px.pie(
-                    df_avg_response_time,
-                    values='Average_Response_Time', # Les valeurs qui déterminent la taille des tranches
-                    names='TASKTYPE',              # Les noms des tranches
-                    title='Pourcentage du Temps de Réponse Moyen par Type de Tâche',
-                    hover_data=['Average_Response_Time'], # Informations affichées au survol
-                    labels={'Average_Response_Time': 'Temps de Réponse Moyen'}, # Labels pour la légende
-                    color_discrete_sequence=px.colors.qualitative.Pastel # Optionnel: Utilise une palette de couleurs pastel
-                )
-
-                # Personnalisation pour afficher le pourcentage et les labels à l'intérieur
-                fig.update_traces(textposition='inside', textinfo='percent+label',
-                                  marker=dict(line=dict(color='#000000', width=1))) # Bordure noire pour les tranches
-                fig.update_layout(showlegend=True,
-                                  title_font_size=20)
-
-                # Affichage du graphique dans Streamlit
-                st.plotly_chart(fig, use_container_width=True)
+        if not df_user.empty:
+            st.subheader("Top Types de Tâches (TASKTYPE) par Temps de Réponse Moyen")
+            if 'TASKTYPE' in df_user.columns and 'RESPTI' in df_user.columns and df_user['RESPTI'].sum() > 0:
+                # Ensure RESPTI is numeric before aggregation
+                df_user['RESPTI'] = pd.to_numeric(df_user['RESPTI'], errors='coerce').fillna(0).astype(float)
+                temp_top_tasktype_resp = df_user.groupby('TASKTYPE', as_index=False)['RESPTI'].mean().nlargest(10, 'RESPTI')
+                if not temp_top_tasktype_resp.empty and temp_top_tasktype_resp['RESPTI'].sum() > 0:
+                    fig_top_tasktype_resp = px.bar(temp_top_tasktype_resp,
+                                                x='TASKTYPE',
+                                                y='RESPTI',
+                                                title="Top 10 Types de Tâches par Temps de Réponse Moyen",
+                                                labels={'RESPTI': 'Temps de Réponse Moyen (ms)', 'TASKTYPE': 'Type de Tâche'},
+                                                color='RESPTI', color_continuous_scale=px.colors.sequential.Cividis)
+                    st.plotly_chart(fig_top_tasktype_resp, use_container_width=True)
+                else:
+                    st.info("Pas de données valides pour les Top Types de Tâches par Temps de Réponse Moyen après filtrage.")
             else:
-                st.info("Aucune donnée disponible pour afficher la distribution du temps de réponse moyen par type de tâche après filtrage, ou toutes les valeurs RESPTI sont invalides.")
-        else:
-            missing_cols = [col for col in required_cols_for_pie if col not in df_user_filtered.columns]
-            st.warning(f"Impossible de générer le graphique en secteurs : Colonne(s) manquante(s) dans les données utilisateurs : {', '.join(missing_cols)}. Veuillez vous assurer que 'TASKTYPE' et 'RESPTI' sont présentes.")
-
+                st.info("Colonnes 'TASKTYPE' ou 'RESPTI' manquantes ou RESPTI total est zéro/vide après filtrage.")
 
             st.subheader("Nombre de Transactions par Utilisateur (Top 10)")
             if "usertcode" in dfs and not dfs["usertcode"].empty:
