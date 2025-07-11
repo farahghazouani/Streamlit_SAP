@@ -1428,7 +1428,7 @@ Ce graphique à barres présente le temps CPU moyen consommé par chaque type de
 
 
 
-            st.subheader("Distribution du Temps Moyen par Enregistrement (AVGTPERREC) pour le serveur 'ECC-VE7-00'")
+            st.subheader("Distribution du Temps Moyen par Enregistrement (AVGTPERREC : Average Processing Time per Database Record values) pour le serveur 'ECC-VE7-00'")
             st.markdown("""
                 Cette courbe de densité montre la répartition du temps moyen par enregistrement spécifiquement pour le serveur "ECC-VE7-00".
                 Elle permet d'analyser la cohérence des performances de ce serveur en termes de traitement des enregistrements.
