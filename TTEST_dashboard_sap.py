@@ -6,6 +6,13 @@ import io
 import re
 import plotly.figure_factory as ff
 import scipy # Ajouté pour résoudre ImportError avec create_distplot
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score, mean_absolute_error
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
 
 # --- Chemins vers vos fichiers de données ---
 # ATTENTION : Ces chemins ont été mis à jour pour être RELATIFS.
@@ -106,8 +113,7 @@ def load_and_process_data(file_key, path):
                 df['ACCOUNT'] = clean_string_column(df['ACCOUNT'], 'Compte Inconnu')
             if 'MANDT' in df.columns:
                 df['MANDT'] = clean_string_column(df['MANDT'], 'MANDT Inconnu')
-            if 'TASKTYPE' in df.columns:
-                df['TASKTYPE'] = clean_string_column(df['TASKTYPE'], 'Type de Tâche Inconnu')
+            # TASKTYPE removal: Removed df['TASKTYPE'] = clean_string_column(df['TASKTYPE'], 'Type de Tâche Inconnu')
 
             if 'ENDDATE' in df.columns and 'ENDTIME' in df.columns:
                 df['ENDTIME_STR'] = df['ENDTIME'].astype(str).str.zfill(6)
@@ -162,7 +168,7 @@ def load_and_process_data(file_key, path):
             if 'FULL_DATETIME' in df.columns:
                 df.dropna(subset=['FULL_DATETIME'], inplace=True)
 
-            for col in ['WPID', 'ACCOUNT', 'REPORT', 'ROLLKEY', 'PRIVMODE', 'WPRESTART', 'TASKTYPE']:
+            for col in ['WPID', 'ACCOUNT', 'REPORT', 'ROLLKEY', 'PRIVMODE', 'WPRESTART']: # Removed 'TASKTYPE'
                 if col in df.columns:
                     df[col] = clean_string_column(df[col])
 
@@ -188,8 +194,7 @@ def load_and_process_data(file_key, path):
             
             if 'TIME' in df.columns:
                 df['TIME'] = clean_string_column(df['TIME'])
-            if 'TASKTYPE' in df.columns:
-                df['TASKTYPE'] = clean_string_column(df['TASKTYPE'])
+            # TASKTYPE removal: Removed df['TASKTYPE'] = clean_string_column(df['TASKTYPE'])
             if 'ENTRY_ID' in df.columns:
                 df['ENTRY_ID'] = clean_string_column(df[col])
 
@@ -212,8 +217,7 @@ def load_and_process_data(file_key, path):
             if subset_cols_tasktimes:
                 df.dropna(subset=subset_cols_tasktimes, inplace=True)
             
-            if 'TASKTYPE' in df.columns:
-                df['TASKTYPE'] = clean_string_column(df['TASKTYPE'], 'Type de tâche non spécifié')
+            # TASKTYPE removal: Removed df['TASKTYPE'] = clean_string_column(df['TASKTYPE'], 'Type de tâche non spécifié')
             if 'TIME' in df.columns:
                 df['TIME'] = clean_string_column(df['TIME'])
 
@@ -248,7 +252,7 @@ def load_and_process_data(file_key, path):
             if critical_usertcode_cols:
                 df.dropna(subset=critical_usertcode_cols, inplace=True)
             
-            for col in ['TASKTYPE', 'ENTRY_ID', 'ACCOUNT']:
+            for col in ['ENTRY_ID', 'ACCOUNT']: # Removed 'TASKTYPE'
                 if col in df.columns:
                     df[col] = clean_string_column(df[col])
 
@@ -385,12 +389,12 @@ tab_titles = [
     "Analyse Mémoire",
     "Transactions Utilisateurs",
     "Statistiques Horaires",
-    "Décomposition des Tâches",
     "Insights Hitlist DB",
     "Performance des Processus de Travail",
     "Résumé des Traces de Performance SQL",
     "Analyse des Utilisateurs",
-    "Détection d'Anomalies"
+    "Détection d'Anomalies",
+    "Prédiction de Performance (ML)"
 ]
 
 if 'current_section' not in st.session_state:
@@ -442,36 +446,36 @@ else:
         if selected_reports:
             dfs['hitlist_db'] = dfs['hitlist_db'][dfs['hitlist_db']['REPORT'].isin(selected_reports)]
     
-    all_tasktypes = pd.Index([])
-    if not dfs['usertcode'].empty and 'TASKTYPE' in dfs['usertcode'].columns:
-        all_tasktypes = all_tasktypes.union(dfs['usertcode']['TASKTYPE'].dropna().unique())
-    if not dfs['times'].empty and 'TASKTYPE' in dfs['times'].columns:
-        all_tasktypes = all_tasktypes.union(dfs['times']['TASKTYPE'].dropna().unique())
-    if not dfs['tasktimes'].empty and 'TASKTYPE' in dfs['tasktimes'].columns:
-        all_tasktypes = all_tasktypes.union(dfs['tasktimes']['TASKTYPE'].dropna().unique())
-    if not dfs['hitlist_db'].empty and 'TASKTYPE' in dfs['hitlist_db'].columns:
-        all_tasktypes = all_tasktypes.union(dfs['hitlist_db']['TASKTYPE'].dropna().unique())
-    if not dfs['memory'].empty and 'TASKTYPE' in dfs['memory'].columns: # Added memory to tasktype filter
-        all_tasktypes = all_tasktypes.union(dfs['memory']['TASKTYPE'].dropna().unique())
+    # TASKTYPE removal: Removed global tasktype filter from sidebar
+    # all_tasktypes = pd.Index([])
+    # if not dfs['usertcode'].empty and 'TASKTYPE' in dfs['usertcode'].columns:
+    #     all_tasktypes = all_tasktypes.union(dfs['usertcode']['TASKTYPE'].dropna().unique())
+    # if not dfs['times'].empty and 'TASKTYPE' in dfs['times'].columns:
+    #     all_tasktypes = all_tasktypes.union(dfs['times']['TASKTYPE'].dropna().unique())
+    # if not dfs['tasktimes'].empty and 'TASKTYPE' in dfs['tasktimes'].columns:
+    #     all_tasktypes = all_tasktypes.union(dfs['tasktimes']['TASKTYPE'].dropna().unique())
+    # if not dfs['hitlist_db'].empty and 'TASKTYPE' in dfs['hitlist_db'].columns:
+    #     all_tasktypes = all_tasktypes.union(dfs['hitlist_db']['TASKTYPE'].dropna().unique())
+    # if not dfs['memory'].empty and 'TASKTYPE' in dfs['memory'].columns:
+    #     all_tasktypes = all_tasktypes.union(dfs['memory']['TASKTYPE'].dropna().unique())
 
-
-    selected_tasktypes = []
-    if not all_tasktypes.empty:
-        selected_tasktypes = st.sidebar.multiselect(
-            "Sélectionner des Types de Tâches",
-            options=sorted(all_tasktypes.tolist()),
-            default=[]
-        )
-        if selected_tasktypes:
-            for key in ['usertcode', 'times', 'tasktimes', 'hitlist_db', 'memory']: # Added 'memory' to task type filter
-                if not dfs[key].empty and 'TASKTYPE' in dfs[key].columns:
-                    dfs[key] = dfs[key][dfs[key]['TASKTYPE'].isin(selected_tasktypes)]
+    # selected_tasktypes = []
+    # if not all_tasktypes.empty:
+    #     selected_tasktypes = st.sidebar.multiselect(
+    #         "Sélectionner des Types de Tâches",
+    #         options=sorted(all_tasktypes.tolist()),
+    #         default=[]
+    #     )
+    #     if selected_tasktypes:
+    #         for key in ['usertcode', 'times', 'tasktimes', 'hitlist_db', 'memory']:
+    #             if not dfs[key].empty and 'TASKTYPE' in dfs[key].columns:
+    #                 dfs[key] = dfs[key][dfs[key]['TASKTYPE'].isin(selected_tasktypes)]
     
     selected_wp_types = []
     if not dfs['performance'].empty and 'WP_TYP' in dfs['performance'].columns:
         all_wp_types = dfs['performance']['WP_TYP'].dropna().unique().tolist()
         selected_wp_types = st.sidebar.multiselect(
-            "Sélectionner des Types de Processus de Travail (Performance)",
+            "Sélectionner des Types de Work Process (Performance)",
             options=sorted(all_wp_types),
             default=[]
         )
@@ -488,9 +492,21 @@ else:
         df_mem = dfs['memory'].copy()
         if selected_accounts:
             df_mem = df_mem[df_mem['ACCOUNT'].isin(selected_accounts)]
+        # TASKTYPE removal: Removed if selected_tasktypes filter for df_mem
+        # if selected_tasktypes:
+        #     if 'TASKTYPE' in df_mem.columns:
+        #         df_mem = df_mem[df_mem['TASKTYPE'].isin(selected_tasktypes)]
+        #     else:
+        #         st.warning("La colonne 'TASKTYPE' est manquante dans les données mémoire pour le filtrage.")
 
         if not df_mem.empty:
             st.subheader("Top 10 Utilisateurs par Utilisation Mémoire (USEDBYTES)")
+            st.markdown("""
+                Ce graphique identifie les 10 principaux utilisateurs ou comptes consommant le plus de mémoire (USEDBYTES). Il est essentiel pour détecter les "gros consommateurs" de ressources, comme JBELIM qui domine l'utilisation et ainsi cibler les optimisations de performance système. 
+                Il aide à comprendre qui ou quel processus ABAP (comme WF-BATCH) impacte le plus les ressources mémoire.
+
+
+                """)
             if all(col in df_mem.columns for col in ['ACCOUNT', 'USEDBYTES', 'MAXBYTES', 'PRIVSUM']) and df_mem['USEDBYTES'].sum() > 0:
                 # Ensure numeric types before aggregation
                 df_mem['USEDBYTES'] = pd.to_numeric(df_mem['USEDBYTES'], errors='coerce').fillna(0).astype(float)
@@ -512,6 +528,11 @@ else:
                 st.info("Colonnes nécessaires (ACCOUNT, USEDBYTES, MAXBYTES, PRIVSUM) manquantes ou USEDBYTES total est zéro/vide après filtrage.")
 
             st.subheader("Moyenne de USEDBYTES par Client (ACCOUNT)")
+            st.markdown("""
+                Cette visualisation présente la consommation moyenne de mémoire (USEDBYTES) par client ou compte SAP. 
+                Elle offre une perspective agrégée, utile pour la planification des capacités et la compréhension des tendances d'utilisation par groupe fonctionnel ou type d'activité. 
+                Cela permet d'allouer les ressources mémoire plus efficacement en fonction des besoins moyens des différents clients.
+                """)
             if 'ACCOUNT' in df_mem.columns and 'USEDBYTES' in df_mem.columns and df_mem['USEDBYTES'].sum() > 0:
                 df_mem_account_clean = df_mem[df_mem['ACCOUNT'] != 'Compte Inconnu'].copy()
                 
@@ -544,6 +565,11 @@ else:
                 st.info("Colonnes 'ACCOUNT' ou 'USEDBYTES' manquantes ou USEDBYTES total est zéro/vide après filtrage.")
 
             st.subheader("Distribution de l'Utilisation Mémoire (USEDBYTES) - Courbe de Densité")
+            st.markdown("""
+                 "Densité" indique la fréquence relative à laquelle une valeur d'utilisation mémoire apparaît. 
+                 Un pic élevé sur la courbe signifie que les valeurs de USEDBYTES autour de ce point sont très fréquentes. 
+                 À l'inverse, une faible densité (la courbe se rapprochant de zéro) indique que ces niveaux de consommation mémoire sont rares.
+                """)
             if 'USEDBYTES' in df_mem.columns and df_mem['USEDBYTES'].sum() > 0:
                 # Ensure USEDBYTES is numeric here
                 df_mem['USEDBYTES'] = pd.to_numeric(df_mem['USEDBYTES'], errors='coerce').fillna(0).astype(float)
@@ -556,6 +582,7 @@ else:
                     st.info("La colonne 'USEDBYTES' contient des valeurs uniques ou est vide après filtrage, impossible de créer une courbe de densité.")
             else:
                 st.info("Colonne 'USEDBYTES' manquante ou total est zéro/vide après filtrage.")
+            
 
             if 'FULL_DATETIME' in df_mem.columns and pd.api.types.is_datetime64_any_dtype(df_mem['FULL_DATETIME']) and not df_mem['FULL_DATETIME'].isnull().all() and 'USEDBYTES' in df_mem.columns and df_mem['USEDBYTES'].sum() > 0:
                 # Ensure USEDBYTES is numeric here
@@ -569,8 +596,21 @@ else:
                     pass
             else:
                 pass
+            st.markdown("""
+                Cette courbe de densité illustre la distribution de l'utilisation mémoire (USEDBYTES). 
+                Le pic prononcé près de zéro indique que la majorité des opérations consomment très peu de mémoire. 
+                La "longue queue" vers la droite révèle la présence, bien que rare, de processus gourmands en mémoire. 
+                Il pourrait s'agir de requêtes complexes, de traitements de lot volumineux (comme WF-BATCH qui apparaît dans les autres graphiques), ou d'éventuels problèmes nécessitant une optimisation.
+                """)
             
             st.subheader("Comparaison des Métriques Mémoire (USEDBYTES, MAXBYTES, PRIVSUM) par Compte Utilisateur")
+            st.markdown("""
+                *USEDBYTES: Mémoire actuellement utilisée par un processus ou une session.
+                
+                *MAXBYTES: Quantité maximale de mémoire atteinte par un processus pendant son exécution.
+                
+                *PRIVSUM: Quantité de mémoire privée, non partagée, consommée par un processus.
+                """)
             mem_metrics_cols = ['USEDBYTES', 'MAXBYTES', 'PRIVSUM']
             if all(col in df_mem.columns for col in mem_metrics_cols) and 'ACCOUNT' in df_mem.columns and df_mem[mem_metrics_cols].sum().sum() > 0:
                 # Ensure numeric types before aggregation
@@ -584,27 +624,25 @@ else:
                     st.info("Pas de données valides pour la comparaison des métriques mémoire par compte utilisateur après filtrage.")
             else:
                 st.info("Colonnes nécessaires (ACCOUNT, USEDBYTES, MAXBYTES, PRIVSUM) manquantes ou leurs totaux sont zéro/vides après filtrage pour la comparaison des métriques mémoire.")
-            
-            # NOUVELLE SECTION : Top Types de Tâches par Utilisation Mémoire
-            st.subheader("Top Types de Tâches (TASKTYPE) par Utilisation Mémoire (USEDBYTES)")
-            if 'TASKTYPE' in df_mem.columns and 'USEDBYTES' in df_mem.columns and df_mem['USEDBYTES'].sum() > 0:
-                # Ensure USEDBYTES is numeric here
-                df_mem['USEDBYTES'] = pd.to_numeric(df_mem['USEDBYTES'], errors='coerce').fillna(0).astype(float)
-                top_tasktype_mem = df_mem.groupby('TASKTYPE', as_index=False)['USEDBYTES'].sum().nlargest(3, 'USEDBYTES') # Ajout de 'USEDBYTES' comme critère
-                if not top_tasktype_mem.empty and top_tasktype_mem['USEDBYTES'].sum() > 0:
-                    fig_top_tasktype_mem = px.bar(top_tasktype_mem,
-                                                x='TASKTYPE', y='USEDBYTES',
-                                                title="Top 3 Types de Tâches par Utilisation Mémoire (USEDBYTES)",
-                                                labels={'USEDBYTES': 'Utilisation Mémoire Totale (Octets)', 'TASKTYPE': 'Type de Tâche'},
-                                                color='USEDBYTES', color_continuous_scale=px.colors.sequential.Greys)
-                    st.plotly_chart(fig_top_tasktype_mem, use_container_width=True)
-                else:
-                    st.info("Pas de données valides pour les Top Types de Tâches par Utilisation Mémoire après filtrage.")
-            else:
-                st.info("Colonnes 'TASKTYPE' ou 'USEDBYTES' manquantes ou USEDBYTES total est zéro/vide après filtrage pour les types de tâches mémoire.")
+
+            # TASKTYPE removal: Removed section "Top Types de Tâches par Utilisation Mémoire"
+            # st.subheader("Top Types de Tâches (TASKTYPE) par Utilisation Mémoire (USEDBYTES)")
+            # if 'TASKTYPE' in df_mem.columns and 'USEDBYTES' in df_mem.columns and df_mem['USEDBYTES'].sum() > 0:
+            #     df_mem['USEDBYTES'] = pd.to_numeric(df_mem['USEDBYTES'], errors='coerce').fillna(0).astype(float)
+            #     top_tasktype_mem = df_mem.groupby('TASKTYPE', as_index=False)['USEDBYTES'].sum().nlargest(3, 'USEDBYTES')
+            #     if not top_tasktype_mem.empty and top_tasktype_mem['USEDBYTES'].sum() > 0:
+            #         fig_top_tasktype_mem = px.bar(top_tasktype_mem, x='TASKTYPE', y='USEDBYTES', title="Top 3 Types de Tâches par Utilisation Mémoire (USEDBYTES)", labels={'USEDBYTES': 'Utilisation Mémoire Totale (Octets)', 'TASKTYPE': 'Type de Tâche'}, color='USEDBYTES', color_continuous_scale=px.colors.sequential.Greys)
+            #         st.plotly_chart(fig_top_tasktype_mem, use_container_width=True)
+            #     else:
+            #         st.info("Pas de données valides pour les Top Types de Tâches par Utilisation Mémoire après filtrage.")
+            # else:
+            #     st.info("Colonnes 'TASKTYPE' ou 'USEDBYTES' manquantes ou USEDBYTES total est zéro/vide après filtrage pour les types de tâches mémoire.")
 
             st.subheader("Aperçu des Données Mémoire Filtrées")
-            st.dataframe(df_mem.head())
+            # Displaying only relevant columns for an overview, excluding TASKTYPE
+            # TASKTYPE removal: Ensure TASKTYPE is not in this list
+            columns_to_display = [col for col in df_mem.columns if col not in ['TASKTYPE', 'FULL_DATETIME']]
+            st.dataframe(df_mem[columns_to_display].head())
         else:
             st.warning("Données mémoire non disponibles ou filtrées à vide.")
 
@@ -617,76 +655,174 @@ else:
                 df_user = df_user[df_user['ACCOUNT'].isin(selected_accounts)]
             else:
                 st.warning("La colonne 'ACCOUNT' est manquante dans les données utilisateurs pour le filtrage.")
-        if selected_tasktypes:
-            if 'TASKTYPE' in df_user.columns:
-                df_user = df_user[df_user['TASKTYPE'].isin(selected_tasktypes)]
-            else:
-                st.warning("La colonne 'TASKTYPE' est manquante dans les données utilisateurs pour le filtrage.")
+        # TASKTYPE removal: Removed if selected_tasktypes filter for df_user
+        # if selected_tasktypes:
+        #     if 'TASKTYPE' in df_user.columns:
+        #         df_user = df_user[df_user['TASKTYPE'].isin(selected_tasktypes)]
+        #     else:
+        #         st.warning("La colonne 'TASKTYPE' est manquante dans les données utilisateurs pour le filtrage.")
 
         if not df_user.empty:
-            st.subheader("Top Types de Tâches (TASKTYPE) par Temps de Réponse Moyen")
-            if 'TASKTYPE' in df_user.columns and 'RESPTI' in df_user.columns and df_user['RESPTI'].sum() > 0:
-                # Ensure RESPTI is numeric before aggregation
-                df_user['RESPTI'] = pd.to_numeric(df_user['RESPTI'], errors='coerce').fillna(0).astype(float)
-                temp_top_tasktype_resp = df_user.groupby('TASKTYPE', as_index=False)['RESPTI'].mean().nlargest(10, 'RESPTI')
-                if not temp_top_tasktype_resp.empty and temp_top_tasktype_resp['RESPTI'].sum() > 0:
-                    fig_top_tasktype_resp = px.bar(temp_top_tasktype_resp,
-                                                x='TASKTYPE',
-                                                y='RESPTI',
-                                                title="Top 10 Types de Tâches par Temps de Réponse Moyen",
-                                                labels={'RESPTI': 'Temps de Réponse Moyen (ms)', 'TASKTYPE': 'Type de Tâche'},
-                                                color='RESPTI', color_continuous_scale=px.colors.sequential.Cividis)
-                    st.plotly_chart(fig_top_tasktype_resp, use_container_width=True)
+            # --- Section modifiée: Top 10 des Comptes (ACCOUNT) par Temps de Réponse Moyen (en cercle) ---
+            st.subheader("Top 10 des Comptes (ACCOUNT) par Temps de Réponse Moyen (Proportionnel)")
+            st.markdown("""
+                Cette visualisation présente les 10 comptes utilisateurs qui consomment le plus de temps CPU moyen. 
+                Elle est importante pour identifier les processus ou utilisateurs les plus gourmands en calcul, 
+                permettant ainsi de cibler les optimisations pour améliorer l'efficacité du processeur.
+            """)
+            if 'ACCOUNT' in df_user.columns and 'CPUTI' in df_user.columns and df_user['CPUTI'].sum() > 0:
+                df_user['CPUTI'] = pd.to_numeric(df_user['CPUTI'], errors='coerce').fillna(0).astype(float)
+                
+                # Regrouper par ACCOUNT et prendre la moyenne de CPUTI, puis sélectionner les 10 plus grands
+                # Trié par CPUTI (Temps CPU)
+                temp_top_account_cpu = df_user.groupby('ACCOUNT', as_index=False)['CPUTI'].mean().nlargest(10, 'CPUTI')
+                
+                if not temp_top_account_cpu.empty and temp_top_account_cpu['CPUTI'].sum() > 0:
+                    # Convertir CPUTI en secondes pour une meilleure lisibilité
+                    temp_top_account_cpu['CPUTI_SECONDS'] = temp_top_account_cpu['CPUTI'] / 1000.0
+
+                    fig_top_account_cpu = px.bar(temp_top_account_cpu,
+                                                    x='ACCOUNT', # L'axe X est le compte utilisateur
+                                                    y='CPUTI_SECONDS', # L'axe Y est le temps CPU moyen en secondes
+                                                    title="Top 10 des Comptes par Temps CPU Moyen (s)",
+                                                    labels={'CPUTI_SECONDS': 'Temps CPU Moyen (s)', 'ACCOUNT': 'Compte Utilisateur'},
+                                                    color='CPUTI_SECONDS', # Utiliser la couleur basée sur la valeur CPUTI
+                                                    color_continuous_scale=px.colors.sequential.Viridis # Une échelle de couleur appropriée
+                                                )
+                    # Pas besoin de update_traces pour textposition/textinfo car ce n'est plus un pie chart
+                    st.plotly_chart(fig_top_account_cpu, use_container_width=True)
                 else:
-                    st.info("Pas de données valides pour les Top Types de Tâches par Temps de Réponse Moyen après filtrage.")
+                    st.info("Pas de données valides pour le Top 10 des Comptes par Temps CPU Moyen après filtrage.")
             else:
-                st.info("Colonnes 'TASKTYPE' ou 'RESPTI' manquantes ou RESPTI total est zéro/vide après filtrage.")
+                st.info("Colonnes 'ACCOUNT' ou 'CPUTI' manquantes ou CPUTI total est zéro/vide après filtrage.")
+
+            # --- Nouvelle Section: Top 10 des Rapports (REPORT) par Temps de Réponse Moyen (en cercle) ---
+            st.subheader("Top 10 des Rapports (REPORT) par Temps de Réponse Moyen (Proportionnel)")
+            st.markdown("""
+                 Cette visualisation présente la contribution proportionnelle des 10 rapports (programmes ABAP) les plus impactants en termes de temps de réponse moyen. Contrairement à l'analyse par utilisateur, celle-ci se concentre sur les programmes eux-mêmes, indépendamment de l'utilisateur qui les exécute.
+                """)
+            if 'REPORT' in df_user.columns and 'RESPTI' in df_user.columns and df_user['RESPTI'].sum() > 0:
+                df_user['RESPTI'] = pd.to_numeric(df_user['RESPTI'], errors='coerce').fillna(0).astype(float)
+                
+                temp_top_report_resp = df_user.groupby('REPORT', as_index=False)['RESPTI'].mean().nlargest(10, 'RESPTI')
+                
+                if not temp_top_report_resp.empty and temp_top_report_resp['RESPTI'].sum() > 0:
+                    fig_top_report_resp = px.pie(temp_top_report_resp,
+                                                    values='RESPTI',
+                                                    names='REPORT',
+                                                    title="Top 10 des Rapports par Temps de Réponse Moyen",
+                                                    labels={'RESPTI': 'Temps de Réponse Moyen (ms)', 'REPORT': 'Nom du Rapport'},
+                                                    color_discrete_sequence=px.colors.sequential.Viridis,
+                                                    # hole=0.4
+                                                    )
+                    fig_top_report_resp.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig_top_report_resp, use_container_width=True)
+                else:
+                    st.info("Pas de données valides pour le Top 10 des Rapports par Temps de Réponse Moyen après filtrage.")
+            else:
+                st.info("Colonnes 'REPORT' ou 'RESPTI' manquantes ou RESPTI total est zéro/vide après filtrage.")
 
             st.subheader("Nombre de Transactions par Utilisateur (Top 10)")
-            if "usertcode" in dfs and not dfs["usertcode"].empty:
-                df_usertcode = dfs["usertcode"].copy()
-                if selected_accounts:
-                    df_usertcode = df_usertcode[df_usertcode['ACCOUNT'].isin(selected_accounts)]
-                if selected_tasktypes:
-                    df_usertcode = df_usertcode[df_usertcode['TASKTYPE'].isin(selected_tasktypes)]
+            st.markdown("""
+                 Cette analyse permet d'identifier les utilisateurs qui sont les plus actifs en termes de volume d'opérations sur le système SAP.
+                """)
+            if 'ACCOUNT' in df_user.columns and not df_user.empty:
+                df_transactions_per_user = df_user.groupby('ACCOUNT').size().reset_index(name='TRANSACTION_COUNT')
+                df_transactions_per_user = df_transactions_per_user.sort_values(by='TRANSACTION_COUNT', ascending=False).head(10)
 
-                if 'ACCOUNT' in df_usertcode.columns:
-                    df_transactions_per_user = df_usertcode.groupby('ACCOUNT').size().reset_index(name='TRANSACTION_COUNT')
-                    df_transactions_per_user = df_transactions_per_user.sort_values(by='TRANSACTION_COUNT', ascending=False).head(10)
-
-                    if not df_transactions_per_user.empty:
-                        fig_transactions_user = px.bar(
-                            df_transactions_per_user,
-                            x='ACCOUNT',
-                            y='TRANSACTION_COUNT',
-                            title='Top 10 des Utilisateurs par Nombre de Transactions',
-                            labels={'ACCOUNT': 'Utilisateur', 'TRANSACTION_COUNT': 'Nombre de Transactions'}
-                        )
-                        st.plotly_chart(fig_transactions_user, use_container_width=True)
-                    else:
-                        st.info("Aucune donnée de transaction par utilisateur disponible après filtrage.")
+                if not df_transactions_per_user.empty:
+                    fig_transactions_user = px.bar(
+                        df_transactions_per_user,
+                        x='ACCOUNT',
+                        y='TRANSACTION_COUNT',
+                        title='Top 10 des Utilisateurs par Nombre de Transactions',
+                        labels={'ACCOUNT': 'Utilisateur', 'TRANSACTION_COUNT': 'Nombre de Transactions'}
+                    )
+                    st.plotly_chart(fig_transactions_user, use_container_width=True)
                 else:
-                    st.info("La colonne 'ACCOUNT' est manquante dans le DataFrame 'usertcode' pour les transactions par utilisateur.")
+                    st.info("Aucune donnée de transaction par utilisateur disponible après filtrage.")
             else:
-                st.warning("Données de transactions par utilisateur (USERTCODE) non disponibles ou filtrées à vide.")
+                st.info("La colonne 'ACCOUNT' est manquante dans les données utilisateurs pour les transactions par utilisateur ou le DataFrame est vide.")
 
             # NOUVELLE VISUALISATION : Tendance du Temps de Réponse Moyen par Heure
             st.subheader("Tendance du Temps de Réponse Moyen par Heure")
+            st.markdown("""
+                 Ce graphique linéaire représente l'évolution du temps de réponse moyen du système SAP heure par heure au cours de la période analysée.
+                """)
             if 'FULL_DATETIME' in df_user.columns and pd.api.types.is_datetime64_any_dtype(df_user['FULL_DATETIME']) and not df_user['FULL_DATETIME'].isnull().all() and 'RESPTI' in df_user.columns and df_user['RESPTI'].sum() > 0:
-                # Ensure RESPTI is numeric here
                 df_user['RESPTI'] = pd.to_numeric(df_user['RESPTI'], errors='coerce').fillna(0).astype(float)
-                hourly_resp_time = df_user.set_index('FULL_DATETIME')['RESPTI'].resample('H').mean().dropna() / 1000.0
-                if not hourly_resp_time.empty:
-                    fig_hourly_resp = px.line(hourly_resp_time.reset_index(), x='FULL_DATETIME', y='RESPTI',
-                                                title="Tendance du Temps de Réponse Moyen par Heure (s)",
-                                                labels={'FULL_DATETIME': 'Heure', 'RESPTI': 'Temps de Réponse Moyen (s)'},
+                time_bins_definition = [
+                    (0, 6, "00--06"),
+                    (6, 7, "06--07"),
+                    (7, 8, "07--08"),
+                    (8, 9, "08--09"),
+                    (9, 10, "09--10"),
+                    (10, 11, "10--11"),
+                    (11, 12, "11--12"),
+                    (12, 13, "12--13"),
+                    (13, 14, "13--14"),
+                    (14, 15, "14--15"),
+                    (15, 16, "15--16"),
+                    (16, 17, "16--17"),
+                    (17, 18, "17--18"),
+                    (18, 19, "18--19"),
+                    (19, 20, "19--20"),
+                    (20, 21, "20--21"),
+                    (21, 22, "21--22"),
+                    (22, 23, "22--23"),
+                    (23, 24, "23--00") # 23:00 à 23:59
+                ]
+
+                # Créer une liste ordonnée de tous les labels de tranches horaires possibles
+                ordered_time_labels = [label for _, _, label in time_bins_definition]
+
+                # Fonction pour assigner une tranche horaire à chaque heure avec double tiret
+                def get_time_range_label(hour):
+                    if 0 <= hour < 6:
+                        return "00--06"
+                    else:
+                        return f"{hour:02d}--{hour+1:02d}"
+
+                # Appliquer la fonction pour créer la nouvelle colonne 'TIME_RANGE' dans df_user
+                df_user['TIME_RANGE'] = df_user['FULL_DATETIME'].dt.hour.apply(get_time_range_label)
+
+                # Regrouper par la nouvelle colonne 'TIME_RANGE' et calculer la moyenne
+                hourly_resp_time_agg = df_user.groupby('TIME_RANGE')['RESPTI'].mean().reset_index()
+
+                # Créer un DataFrame complet avec toutes les tranches horaires possibles
+                full_time_ranges_df = pd.DataFrame({'TIME_RANGE': ordered_time_labels})
+
+                # Fusionner les données agrégées avec le DataFrame complet pour inclure toutes les heures
+                # Remplir les valeurs manquantes (pour les heures sans données) avec 0
+                hourly_resp_time_full = pd.merge(full_time_ranges_df, hourly_resp_time_agg, on='TIME_RANGE', how='left').fillna(0)
+
+                # Assurer l'ordre correct des tranches horaires sur l'axe des X
+                hourly_resp_time_full['TIME_RANGE'] = pd.Categorical(hourly_resp_time_full['TIME_RANGE'], 
+                                                                      categories=ordered_time_labels, ordered=True)
+                hourly_resp_time_full = hourly_resp_time_full.sort_values('TIME_RANGE')
+
+                # Convertir RESPTI en secondes
+                hourly_resp_time_full['RESPTI_SECONDS'] = hourly_resp_time_full['RESPTI'] / 1000.0
+                
+                if not hourly_resp_time_full.empty:
+                    fig_hourly_resp = px.line(hourly_resp_time_full, x='TIME_RANGE', y='RESPTI_SECONDS', # Utiliser TIME_RANGE et RESPTI_SECONDS
+                                                title="Tendance du Temps de Réponse Moyen par Tranche Horaire (s)", # Titre mis à jour
+                                                labels={'TIME_RANGE': 'Tranche Horaire', 'RESPTI_SECONDS': 'Temps de Réponse Moyen (s)'}, # Labels mis à jour
                                                 color_discrete_sequence=['red'])
-                    fig_hourly_resp.update_xaxes(dtick="H1", tickformat="%H:%M")
+                    
+                    # Mettre à jour l'axe des X pour afficher les tranches horaires comme catégories ordonnées
+                    fig_hourly_resp.update_xaxes(
+                        title_text="Tranche Horaire", # Titre de l'axe des X mis à jour
+                        categoryorder='array', # Important pour l'ordre des catégories
+                        categoryarray=ordered_time_labels # Utiliser l'ordre défini
+                    )
+                    
                     st.plotly_chart(fig_hourly_resp, use_container_width=True)
                 else:
                     st.info("Pas de données valides pour la tendance horaire du temps de réponse après filtrage.")
             else:
-                st.info("Colonnes 'FULL_DATETIME' ou 'RESPTI' manquantes/invalides ou RESPTI total est zéro/vide après filtrage pour la tendance.")
+                st.info("Colonnes 'FULL_DATETIME' ou 'RESPTI' manquantes/invalides, ou RESPTI total est zéro/vide après filtrage pour la tendance.")
+
             
             st.subheader("Corrélation entre Temps de Réponse et Temps CPU")
             st.markdown("""
@@ -694,63 +830,80 @@ else:
                 * Chaque point représente une transaction.
                 * Une tendance à la hausse (points allant de bas à gauche vers haut à droite) suggère que plus une transaction utilise de CPU, plus son temps de réponse est long.
                 * Les points éloignés de la tendance peuvent indiquer d'autres facteurs influençant le temps de réponse (par exemple, des attentes E/S, des verrous, etc.).
-                * La couleur des points indique le type de tâche, aidant à identifier les catégories de transactions qui se comportent différemment.
                 """)
             
             hover_data_cols = []
             if 'ACCOUNT' in df_user.columns:
                 hover_data_cols.append('ACCOUNT')
-            if 'TASKTYPE' in df_user.columns:
-                hover_data_cols.append('TASKTYPE')
+            # TASKTYPE removal: Removed 'TASKTYPE' from hover_data_cols
+            # if 'TASKTYPE' in df_user.columns:
+            #     hover_data_cols.append('TASKTYPE')
             if 'ENTRY_ID' in df_user.columns:
                 hover_data_cols.append('ENTRY_ID')
 
             if 'RESPTI' in df_user.columns and 'CPUTI' in df_user.columns and df_user['CPUTI'].sum() > 0 and df_user['RESPTI'].sum() > 0:
-                # Ensure numeric types here
                 df_user['RESPTI'] = pd.to_numeric(df_user['RESPTI'], errors='coerce').fillna(0).astype(float)
                 df_user['CPUTI'] = pd.to_numeric(df_user['CPUTI'], errors='coerce').fillna(0).astype(float)
-                fig_resp_cpu_corr = px.scatter(df_user, x='CPUTI', y='RESPTI',
-                                                title="Temps de Réponse vs. Temps CPU",
-                                                labels={'CPUTI': 'Temps CPU (ms)', 'RESPTI': 'Temps de Réponse (ms)'},
-                                                hover_data=hover_data_cols,
-                                                color='TASKTYPE' if 'TASKTYPE' in df_user.columns else None,
-                                                log_x=True,
-                                                log_y=True,
-                                                # Removed: trendline="ols" - requires 'statsmodels' which causes installation issues
-                                                color_discrete_sequence=px.colors.qualitative.Alphabet)
-                st.plotly_chart(fig_resp_cpu_corr, use_container_width=True)
+                
+                # Change color to 'ACCOUNT'
+                if 'ACCOUNT' in df_user.columns:
+                    fig_resp_cpu_corr = px.scatter(df_user, x='CPUTI', y='RESPTI',
+                                                    title="Temps de Réponse vs. Temps CPU par Compte", # Updated title
+                                                    labels={'CPUTI': 'Temps CPU (ms)', 'RESPTI': 'Temps de Réponse (ms)'},
+                                                    hover_data=hover_data_cols,
+                                                    color='ACCOUNT', # Changed color to 'ACCOUNT'
+                                                    log_x=True,
+                                                    log_y=True,
+                                                    color_discrete_sequence=px.colors.qualitative.Alphabet)
+                    st.plotly_chart(fig_resp_cpu_corr, use_container_width=True)
+                else:
+                    st.info("La colonne 'ACCOUNT' est manquante pour colorer le graphique de corrélation. Affichage sans couleur de compte.")
+                    fig_resp_cpu_corr = px.scatter(df_user, x='CPUTI', y='RESPTI',
+                                                    title="Temps de Réponse vs. Temps CPU",
+                                                    labels={'CPUTI': 'Temps CPU (ms)', 'RESPTI': 'Temps de Réponse (ms)'},
+                                                    hover_data=hover_data_cols,
+                                                    log_x=True,
+                                                    log_y=True,
+                                                    color_discrete_sequence=px.colors.qualitative.Alphabet)
+                    st.plotly_chart(fig_resp_cpu_corr, use_container_width=True)
             else:
                 st.info("Colonnes 'RESPTI' ou 'CPUTI' manquantes ou leurs totaux sont zéro/vide après filtrage pour la corrélation.")
             
             io_detailed_metrics_counts = ['READDIRCNT', 'READSEQCNT', 'CHNGCNT', 'PHYREADCNT']
-            if 'TASKTYPE' in df_user.columns and all(col in df_user.columns for col in io_detailed_metrics_counts) and df_user[io_detailed_metrics_counts].sum().sum() > 0:
-                st.subheader("Total des Opérations de Lecture/Écriture (Comptes) par Type de Tâche")
+            # Improved message handling: Check if all metrics are present and have sum > 0
+            if all(col in df_user.columns for col in io_detailed_metrics_counts) and df_user[io_detailed_metrics_counts].sum().sum() > 0:
+                st.subheader("Total des Opérations de Lecture/Écriture (Comptes)") # Removed "par Type de Tâche"
                 st.markdown("""
-                    Ce graphique présente le total des opérations de lecture et d'écriture par type de tâche.
+                    Ce graphique présente le total des opérations de lecture et d'écriture.
                     * **READDIRCNT** : Nombre de lectures directes (accès spécifiques à des blocs de données).
                     * **READSEQCNT** : Nombre de lectures séquentielles (accès consécutives aux données).
                     * **CHNGCNT** : Nombre de changements (écritures) d'enregistrements.
                     * **PHYREADCNT** : Nombre total de lectures physiques (lectures réelles depuis le disque).
-                    Ces métriques sont cruciales pour comprendre l'intensité des interactions de chaque tâche avec la base de données ou le système de fichiers.
+                    Ces métriques sont cruciales pour comprendre l'intensité des interactions avec la base de données ou le système de fichiers.
                     """)
-                # Ensure numeric types here
                 for col in io_detailed_metrics_counts:
                     df_user[col] = pd.to_numeric(df_user[col], errors='coerce').fillna(0).astype(float)
-                df_io_counts = df_user.groupby('TASKTYPE', as_index=False)[io_detailed_metrics_counts].sum().nlargest(10, 'PHYREADCNT')
-                if not df_io_counts.empty and df_io_counts['PHYREADCNT'].sum() > 0: # Check sum of the column used for nlargest
-                    fig_io_counts = px.bar(df_io_counts, x='TASKTYPE', y=io_detailed_metrics_counts,
-                                           title="Total des Opérations de Lecture/Écriture (Comptes) par Type de Tâche (Top 10)",
-                                           labels={'value': 'Nombre d\'Opérations', 'variable': 'Type d\'Opération', 'TASKTYPE': 'Type de Tâche'},
-                                           barmode='group', color_discrete_sequence=px.colors.sequential.Blues)
-                    st.plotly_chart(fig_io_counts, use_container_width=True)
-                else:
-                    st.info("Données insuffisantes pour les opérations de lecture/écriture (comptes) après filtrage.")
-            else:
-                pass
+                
+                # TASKTYPE removal: Group by ACCOUNT instead of TASKTYPE, or remove grouping if not sensible
+                if 'ACCOUNT' in df_user.columns:
+                    df_io_counts = df_user.groupby('ACCOUNT', as_index=False)[io_detailed_metrics_counts].sum().nlargest(10, 'PHYREADCNT')
+                    if not df_io_counts.empty and df_io_counts['PHYREADCNT'].sum() > 0:
+                        fig_io_counts = px.bar(df_io_counts, x='ACCOUNT', y=io_detailed_metrics_counts, # Changed x to ACCOUNT
+                                                title="Total des Opérations de Lecture/Écriture (Comptes) par Utilisateur (Top 10)", # Updated title
+                                                labels={'value': 'Nombre d\'Opérations', 'variable': 'Type d\'Opération', 'ACCOUNT': 'Compte Utilisateur'}, # Updated label
+                                                barmode='group', color_discrete_sequence=px.colors.sequential.Blues)
+                        st.plotly_chart(fig_io_counts, use_container_width=True)
+                    # else: # Removed this st.info message
+                    #     st.info("Données insuffisantes pour les opérations de lecture/écriture après filtrage.")
+                # else: # Removed this st.info message
+                #     st.info("La colonne 'ACCOUNT' est manquante pour agréger les opérations d'E/S.")
+            # else: # Removed this st.info message
+            #     st.info("Données insuffisantes pour les métriques d'opérations de lecture/écriture après filtrage.")
 
             io_detailed_metrics_buffers_records = ['READDIRBUF', 'READDIRREC', 'READSEQBUF', 'READSEQREC', 'CHNGREC', 'PHYCHNGREC']
-            if 'TASKTYPE' in df_user.columns and all(col in df_user.columns for col in io_detailed_metrics_buffers_records) and df_user[io_detailed_metrics_buffers_records].sum().sum() > 0:
-                st.subheader("Utilisation des Buffers et Enregistrements par Type de Tâche")
+            # Improved message handling: Check if all metrics are present and have sum > 0
+            if all(col in df_user.columns for col in io_detailed_metrics_buffers_records) and df_user[io_detailed_metrics_buffers_records].sum().sum() > 0:
+                st.subheader("Utilisation des Buffers et Enregistrements par Utilisateur") # Removed "par Type de Tâche"
                 st.markdown("""
                     Ce graphique détaille l'efficacité des opérations d'E/S en montrant l'utilisation des tampons et le nombre d'enregistrements traités.
                     * **READDIRBUF** : Nombre de lectures directes via buffer.
@@ -759,57 +912,69 @@ else:
                     * **READSEQREC** : Nombre d'enregistrements lus séquentiellement.
                     * **CHNGREC** : Nombre d'enregistrements modifiés.
                     * **PHYCHNGREC** : Nombre total d'enregistrements physiquement modifiés.
-                    Ces métriques aident à évaluer si les tâches tirent parti de la mise en cache (buffers) et l'ampleur des données traitées.
+                    Ces métriques aident à évaluer si les opérations tirent parti de la mise en cache (buffers) et l'ampleur des données traitées.
                     """)
-                # Ensure numeric types here
                 for col in io_detailed_metrics_buffers_records:
                     df_user[col] = pd.to_numeric(df_user[col], errors='coerce').fillna(0).astype(float)
-                df_io_buffers_records = df_user.groupby('TASKTYPE', as_index=False)[io_detailed_metrics_buffers_records].sum().nlargest(10, 'READDIRREC')
-                if not df_io_buffers_records.empty and df_io_buffers_records['READDIRREC'].sum() > 0: # Check sum of the column used for nlargest
-                    fig_io_buffers_records = px.bar(df_io_buffers_records, x='TASKTYPE', y=io_detailed_metrics_buffers_records,
-                                                     title="Utilisation des Buffers et Enregistrements par Type de Tâche (Top 10)",
-                                                     labels={'value': 'Nombre', 'variable': 'Métrique', 'TASKTYPE': 'Type de Tâche'},
-                                                     barmode='group', color_discrete_sequence=px.colors.sequential.Plasma)
-                    st.plotly_chart(fig_io_buffers_records, use_container_width=True)
-                else:
-                    st.info("Données insuffisantes pour l'utilisation des buffers et enregistrements après filtrage.")
-            else:
-                pass
+                
+                # TASKTYPE removal: Group by ACCOUNT instead of TASKTYPE
+                if 'ACCOUNT' in df_user.columns:
+                    df_io_buffers_records = df_user.groupby('ACCOUNT', as_index=False)[io_detailed_metrics_buffers_records].sum().nlargest(10, 'READDIRREC')
+                    if not df_io_buffers_records.empty and df_io_buffers_records['READDIRREC'].sum() > 0:
+                        fig_io_buffers_records = px.bar(df_io_buffers_records, x='ACCOUNT', y=io_detailed_metrics_buffers_records, # Changed x to ACCOUNT
+                                                        title="Utilisation des Buffers et Enregistrements par Utilisateur (Top 10)", # Updated title
+                                                        labels={'value': 'Nombre', 'variable': 'Métrique', 'ACCOUNT': 'Compte Utilisateur'}, # Updated label
+                                                        barmode='group', color_discrete_sequence=px.colors.sequential.Plasma)
+                        st.plotly_chart(fig_io_buffers_records, use_container_width=True)
+                    # else: # Removed this st.info message
+                    #     st.info("Données insuffisantes pour l'utilisation des buffers et enregistrements après filtrage.")
+                # else: # Removed this st.info message
+                #     st.info("La colonne 'ACCOUNT' est manquante pour agréger l'utilisation des buffers/enregistrements.")
+            # else: # Removed this st.info message
+            #     st.info("Données insuffisantes pour l'utilisation des buffers et enregistrements après filtrage.")
             
             comm_metrics_filtered = ['DSQLCNT', 'SLI_CNT']
-            if 'TASKTYPE' in df_user.columns and all(col in df_user.columns for col in comm_metrics_filtered) and df_user[comm_metrics_filtered].sum().sum() > 0:
-                st.subheader("Analyse des Communications et Appels Système par Type de Tâche (DSQLCNT et SLI_CNT)")
+            # Improved message handling: Check if all metrics are present and have sum > 0
+            if all(col in df_user.columns for col in comm_metrics_filtered) and df_user[comm_metrics_filtered].sum().sum() > 0:
+                st.subheader("Analyse des Communications et Appels Système par Utilisateur (DSQLCNT et SLI_CNT)") # Removed "par Type de Tâche"
                 st.markdown("""
-                    Ce graphique se concentre sur deux métriques clés pour les interactions des tâches avec d'autres systèmes :
+                    Ce graphique se concentre sur deux métriques clés pour les interactions avec d'autres systèmes :
                     * **DSQLCNT** : Nombre d'appels SQL dynamiques (requêtes de base de données générées dynamiquement). Un nombre élevé peut indiquer une forte interaction avec la base de données.
                     * **SLI_CNT** : Nombre d'appels SLI (System Level Interface). Ces appels représentent les interactions de bas niveau avec le système d'exploitation ou d'autres composants système.
                     Ces métriques sont essentielles pour diagnostiquer les problèmes de communication ou les dépendances externes.
                     """)
-                # Ensure numeric types here
                 for col in comm_metrics_filtered:
                     df_user[col] = pd.to_numeric(df_user[col], errors='coerce').fillna(0).astype(float)
-                df_comm_metrics = df_user.groupby('TASKTYPE', as_index=False)[comm_metrics_filtered].sum().nlargest(4, 'DSQLCNT')
-                if not df_comm_metrics.empty and df_comm_metrics['DSQLCNT'].sum() > 0: # Check sum of the column used for nlargest
-                    fig_comm_metrics = px.bar(df_comm_metrics, x='TASKTYPE', y=comm_metrics_filtered,
-                                                 title="Communications et Appels Système par Type de Tâche (Top 4)",
-                                                 labels={'value': 'Nombre / Temps (ms)', 'variable': 'Métrique', 'TASKTYPE': 'Type de Tâche'},
-                                                 barmode='group', color_discrete_sequence=px.colors.qualitative.Bold)
-                    st.plotly_chart(fig_comm_metrics, use_container_width=True)
+                
+                # TASKTYPE removal: Group by ACCOUNT instead of TASKTYPE
+                if 'ACCOUNT' in df_user.columns:
+                    df_comm_metrics = df_user.groupby('ACCOUNT', as_index=False)[comm_metrics_filtered].sum().nlargest(4, 'DSQLCNT') # Changed group by to ACCOUNT
+                    if not df_comm_metrics.empty and df_comm_metrics['DSQLCNT'].sum() > 0:
+                        fig_comm_metrics = px.bar(df_comm_metrics, x='ACCOUNT', y=comm_metrics_filtered, # Changed x to ACCOUNT
+                                                    title="Communications et Appels Système par Utilisateur (Top 4)", # Updated title
+                                                    labels={'value': 'Nombre / Temps (ms)', 'variable': 'Métrique', 'ACCOUNT': 'Compte Utilisateur'}, # Updated label
+                                                    barmode='group', color_discrete_sequence=px.colors.qualitative.Bold)
+                        st.plotly_chart(fig_comm_metrics, use_container_width=True)
+                    else:
+                        st.info("Données insuffisantes pour les métriques de communication et d'appels système après filtrage.")
                 else:
-                    st.info("Données insuffisantes pour les métriques de communication et d'appels système après filtrage.")
+                    st.info("La colonne 'ACCOUNT' est manquante pour agréger les métriques de communication.")
             else:
-                st.info("Colonnes de communication (DSQLCNT, SLI_CNT) manquantes ou leurs sommes sont zéro/vides après filtrage.")
-
+                st.info("Données insuffisantes pour les métriques de communication et d'appels système après filtrage.")
 
             st.subheader("Aperçu des Données Utilisateurs Filtrées")
-            st.dataframe(df_user.head())
+            # TASKTYPE removal: Filter out TASKTYPE from display
+            columns_to_display_user = [col for col in df_user.columns if col not in ['TASKTYPE']]
+            st.dataframe(df_user[columns_to_display_user].head())
         else:
-            st.warning("Données utilisateurs (USERTCODE) non disponibles ou filtrées à vide.")
+            st.warning("Données utilisateurs (USERTCODE) non disponibles ou filtrées à vide. Veuillez vérifier les filtres ou les données source.")
 
     elif st.session_state.current_section == "Statistiques Horaires":
         # --- Onglet 3: Statistiques Horaires (Times_final_cleaned_clean.xlsx) ---
         st.header("⏰ Statistiques Horaires du Système")
         df_times_data = dfs['times'].copy()
+        if 'selected_tasktypes' not in locals() and 'selected_tasktypes' not in globals():
+            selected_tasktypes = [] # Default to an empty list to prevent NameError
         if selected_tasktypes:
             if 'TASKTYPE' in df_times_data.columns:
                 df_times_data = df_times_data[df_times_data['TASKTYPE'].isin(selected_tasktypes)]
@@ -818,32 +983,68 @@ else:
             
         if not df_times_data.empty:
             st.subheader("Évolution du Nombre Total d'Appels Physiques (PHYCALLS) par Tranche Horaire")
+            st.markdown("""
+            Ce graphique linéaire montre le nombre total d'appels physiques (`PHYCALLS`) agrégés par tranches horaires. 
+            Il permet d'identifier les périodes de la journée où l'activité d'accès physique aux données est la plus intense, 
+            ce qui peut indiquer des pics de charge sur la base de données ou le système de fichiers.
+            """)
             if 'TIME' in df_times_data.columns and 'PHYCALLS' in df_times_data.columns and df_times_data['PHYCALLS'].sum() > 0:
                 # Ensure PHYCALLS is numeric here
                 df_times_data['PHYCALLS'] = pd.to_numeric(df_times_data['PHYCALLS'], errors='coerce').fillna(0).astype(float)
-                df_times_data['HOUR_OF_DAY'] = df_times_data['TIME'].apply(lambda x: str(x).split(':')[0].zfill(2) if ':' in str(x) else str(x).zfill(2)[:2])
                 
-                # Appliquer fillna(0) sur la colonne numérique avant de grouper et de convertir en catégorie
-                hourly_counts = df_times_data.groupby('HOUR_OF_DAY', as_index=False)['PHYCALLS'].sum().fillna(0)
+                # --- Définition des catégories horaires ordonnées (doit correspondre à vos données TIME) ---
+                # Basé sur votre exemple de données: "00--06", "06--07", etc.
+                # Assurez-vous que cette liste contient TOUTES les tranches horaires possibles de votre colonne 'TIME'
+                # et dans l'ordre souhaité pour l'axe des X.
+                hourly_categories_phycalls = [
+                    '00--06', '06--07', '07--08', '08--09', '09--10', '10--11', '11--12', '12--13',
+                    '13--14', '14--15', '15--16', '16--17', '17--18', '18--19', '19--20', '20--21',
+                    '21--22', '22--23', '23--00'
+                ]
                 
-                hourly_categories = [str(i).zfill(2) for i in range(24)] # Générer toutes les heures de 00 à 23
-                hourly_counts['HOUR_OF_DAY'] = pd.Categorical(hourly_counts['HOUR_OF_DAY'], categories=hourly_categories, ordered=True)
-                hourly_counts = hourly_counts.sort_values('HOUR_OF_DAY')
+                # Regrouper par la colonne 'TIME' directement et calculer la somme de PHYCALLS
+                # Utilisation de .fillna(0) pour s'assurer que les tranches horaires sans données ont 0 appels physiques
+                hourly_counts_agg = df_times_data.groupby('TIME', as_index=False)['PHYCALLS'].sum()
 
-                if not hourly_counts.empty and hourly_counts['PHYCALLS'].sum() > 0:
-                    fig_phycalls = px.line(hourly_counts,
-                                            x='HOUR_OF_DAY', y='PHYCALLS',
+                # Créer un DataFrame complet avec toutes les tranches horaires possibles
+                full_time_ranges_df_phycalls = pd.DataFrame({'TIME': hourly_categories_phycalls})
+
+                # Fusionner les données agrégées avec le DataFrame complet
+                # pour inclure toutes les tranches horaires et remplir les valeurs manquantes avec 0
+                hourly_counts_full = pd.merge(full_time_ranges_df_phycalls, hourly_counts_agg, on='TIME', how='left').fillna(0)
+
+                # Convertir 'TIME' en type catégoriel avec l'ordre défini
+                hourly_counts_full['TIME'] = pd.Categorical(hourly_counts_full['TIME'], 
+                                                            categories=hourly_categories_phycalls, ordered=True)
+                # Trier le DataFrame par la colonne 'TIME' catégorielle pour assurer le bon ordre sur le graphique
+                hourly_counts_full = hourly_counts_full.sort_values('TIME')
+
+                if not hourly_counts_full.empty and hourly_counts_full['PHYCALLS'].sum() > 0:
+                    fig_phycalls = px.line(hourly_counts_full, # Utiliser le DataFrame complet
+                                            x='TIME', y='PHYCALLS', # Utiliser 'TIME' directement pour l'axe des X
                                             title="Total Appels Physiques par Tranche Horaire",
-                                            labels={'HOUR_OF_DAY': 'Tranche Horaire', 'PHYCALLS': 'Total Appels Physiques'},
+                                            labels={'TIME': 'Tranche Horaire', 'PHYCALLS': 'Total Appels Physiques'},
                                             color_discrete_sequence=px.colors.sequential.Cividis,
                                             markers=True)
+                    
+                    # Mettre à jour l'axe des X pour utiliser l'ordre des catégories défini
+                    fig_phycalls.update_xaxes(
+                        categoryorder='array', 
+                        categoryarray=hourly_categories_phycalls, # Utiliser l'ordre défini
+                        title_text="Tranche Horaire"
+                    )
+                    
                     st.plotly_chart(fig_phycalls, use_container_width=True)
                 else:
-                    pass
+                    st.info("Pas de données valides pour le total des appels physiques après filtrage.")
             else:
                 st.info("Colonnes 'TIME' ou 'PHYCALLS' manquantes ou PHYCALLS total est zéro/vide après filtrage.")
 
+
             st.subheader("Top 5 Tranches Horaires les plus Chargées (Opérations d'E/S)")
+            st.markdown("""
+Ce graphique à barres met en évidence les cinq tranches horaires de la journée qui enregistrent le volume le plus élevé d'opérations d'entrée/sortie (E/S). Les opérations d'E/S incluent la lecture directe (READDIRCNT), la lecture séquentielle (READSEQCNT), et les changements/écritures (CHNGCNT) de données.
+            """)
             io_cols = ['READDIRCNT', 'READSEQCNT', 'CHNGCNT']
             if all(col in df_times_data.columns for col in io_cols) and df_times_data[io_cols].sum().sum() > 0:
                 # Ensure numeric types here
@@ -862,8 +1063,15 @@ else:
                     st.info("Pas de données valides pour les opérations I/O après filtrage.")
             else:
                 st.info("Colonnes I/O manquantes (READDIRCNT, READSEQCNT, CHNGCNT) ou leur somme est zéro/vide après filtrage.")
+            st.markdown("""
+Cette visualisation est essentielle pour identifier les périodes de pointe d'activité sur la base de données et le système de fichiers.
+            """)                
 
             st.subheader("Temps Moyen de Réponse / CPU / Traitement par Tranche Horaire")
+            st.markdown("""
+Ce graphique linéaire présente l'évolution des temps moyens de réponse (RESPTI), CPU (CPUTI), et traitement (PROCTI), agrégés par tranches horaires.
+Cette visualisation est fondamentale pour identifier les périodes de la journée où les performances du système sont les plus impactées. 
+            """)
             perf_cols = ["RESPTI", "CPUTI", "PROCTI"]
             if all(col in df_times_data.columns for col in perf_cols) and df_times_data[perf_cols].sum().sum() > 0:
                 # Ensure columns are numeric here too
@@ -906,259 +1114,182 @@ else:
             st.dataframe(df_times_data.head())
         else:
             st.warning("Données horaires (Times) non disponibles ou filtrées à vide.")
-
     elif st.session_state.current_section == "Décomposition des Tâches":
         # --- Onglet 4: Décomposition des Tâches (TASKTIMES_final_cleaned_clean.xlsx) ---
-        st.header("⚙️ Décomposition des Types de Tâches")
-        df_task = dfs['tasktimes'].copy()
-        if selected_tasktypes:
-            if 'TASKTYPE' in df_task.columns:
-                df_task = df_task[df_task['TASKTYPE'].isin(selected_tasktypes)]
-            else:
-                st.warning("La colonne 'TASKTYPE' est manquante dans les données de temps de tâches pour le filtrage.")
+        st.header("📊 Décomposition des Temps par ENTRY_ID") # Updated title
+        df_tasktimes = dfs['tasktimes'].copy()
+        # TASKTYPE removal: Removed if selected_tasktypes filter for df_tasktimes
+        # if selected_tasktypes:
+        #     df_tasktimes = df_tasktimes[df_tasktimes['TASKTYPE'].isin(selected_tasktypes)]
 
+        if not df_tasktimes.empty:
+            st.subheader("Temps Moyen par ENTRY_ID (RESPTI, PROCTI, CPUTI, QUEUETI)") # Updated title
+            metrics = ['RESPTI', 'PROCTI', 'CPUTI', 'QUEUETI']
+            if 'ENTRY_ID' in df_tasktimes.columns and all(col in df_tasktimes.columns for col in metrics) and df_tasktimes[metrics].sum().sum() > 0:
+                # Ensure numeric types before aggregation
+                for col in metrics:
+                    df_tasktimes[col] = pd.to_numeric(df_tasktimes[col], errors='coerce').fillna(0).astype(float)
 
-        if not df_task.empty:
-            st.subheader("Répartition des Types de Tâches (TASKTYPE)")
-            if 'TASKTYPE' in df_task.columns and 'COUNT' in df_task.columns and df_task['COUNT'].sum() > 0:
-                # Ensure COUNT is numeric here
-                df_task['COUNT'] = pd.to_numeric(df_task['COUNT'], errors='coerce').fillna(0).astype(float)
-                task_counts = df_task.groupby('TASKTYPE', as_index=False)['COUNT'].sum()
-                task_counts.columns = ['TASKTYPE', 'Count']
-                
-                min_count_for_pie = task_counts['Count'].sum() * 0.01
-                significant_tasks = pd.DataFrame() # Initialize as empty DataFrame
-                other_tasks_count = 0
+                # TASKTYPE removal: Group by ENTRY_ID instead of TASKTYPE
+                avg_task_times = df_tasktimes.groupby('ENTRY_ID')[metrics].mean().reset_index()
+                # Sort by RESPTI if it exists, otherwise by another metric
+                if 'RESPTI' in avg_task_times.columns:
+                    avg_task_times = avg_task_times.sort_values(by='RESPTI', ascending=False).head(10) # Limit to top 10 for readability
 
-                if not task_counts.empty:
-                    significant_tasks = task_counts[task_counts['Count'] >= min_count_for_pie]
-                    other_tasks_count = task_counts[task_counts['Count'] < min_count_for_pie]['Count'].sum()
-
-                if other_tasks_count > 0:
-                    significant_tasks = pd.concat([significant_tasks, pd.DataFrame([{'TASKTYPE': 'Autres Petites Tâches', 'Count': other_tasks_count}])])
-
-                if not significant_tasks.empty and significant_tasks['Count'].sum() > 0:
-                    fig_task_dist = px.pie(significant_tasks, values='Count', names='TASKTYPE',
-                                            title="Répartition des Types de Tâches",
-                                            hole=0.3,
-                                            color_discrete_sequence=px.colors.sequential.RdBu)
-                    st.plotly_chart(fig_task_dist, use_container_width=True)
+                if not avg_task_times.empty and avg_task_times[metrics].sum().sum() > 0:
+                    fig_task_times = px.bar(avg_task_times, x='ENTRY_ID', y=metrics, # Changed x to ENTRY_ID
+                                            title="Temps Moyen (ms) par ENTRY_ID (Top 10)", # Updated title
+                                            labels={'value': 'Temps Moyen (ms)', 'variable': 'Métrique', 'ENTRY_ID': 'ID d\'Entrée'}, # Updated label
+                                            barmode='group', color_discrete_sequence=px.colors.qualitative.Prism)
+                    st.plotly_chart(fig_task_times, use_container_width=True)
                 else:
-                    st.info("Pas de données valides pour la répartition des types de tâches après filtrage.")
+                    st.info("Pas de données valides pour les temps moyens par ENTRY_ID après filtrage.")
             else:
-                st.info("Colonnes 'TASKTYPE' ou 'COUNT' manquantes ou COUNT total est zéro/vide après filtrage.")
+                st.info("Colonnes 'ENTRY_ID' ou métriques de temps (RESPTI, etc.) manquantes ou leurs totaux sont zéro/vides après filtrage.")
 
-            st.subheader("Top 10 TASKTYPE par Temps de Réponse (RESPTI) et CPU (CPUTI)")
-            perf_cols_task = ['RESPTI', 'CPUTI']
-            if 'TASKTYPE' in df_task.columns and all(col in df_task.columns for col in perf_cols_task) and df_task[perf_cols_task].sum().sum() > 0:
-                # Ensure columns are numeric here too
-                for col in perf_cols_task:
-                    df_task[col] = pd.to_numeric(df_task[col], errors='coerce').fillna(0).astype(float)
-
-                temp_task_perf = df_task.groupby('TASKTYPE', as_index=False)[perf_cols_task].mean()
-                
-                if not temp_task_perf.empty and 'RESPTI' in temp_task_perf.columns and pd.api.types.is_numeric_dtype(temp_task_perf['RESPTI']): # Check before nlargest and division
-                    if temp_task_perf['RESPTI'].dropna().count() >= 10: # Check if at least 10 non-NaN values
-                        top_task_perf_intermediate = temp_task_perf.nlargest(10, 'RESPTI').sort_values(by='RESPTI', ascending=False)
-                        if not top_task_perf_intermediate.empty and top_task_perf_intermediate['RESPTI'].sum() > 0:
-                            # Ensure columns are numeric before division
-                            for col in perf_cols_task:
-                                top_task_perf_intermediate[col] = pd.to_numeric(top_task_perf_intermediate[col], errors='coerce').fillna(0).astype(float)
-                            
-                            # Apply division only to the numeric column
-                            task_perf = top_task_perf_intermediate.copy() # Create a copy
-                            for col in perf_cols_task:
-                                task_perf[col] = task_perf[col] / 1000.0
-                            
-                            if not task_perf.empty and task_perf['RESPTI'].sum() > 0:
-                                fig_task_perf = px.bar(task_perf,
-                                                        x='TASKTYPE', y=perf_cols_task,
-                                                        title="Top 10 TASKTYPE par Temps de Réponse et CPU (s)",
-                                                        labels={'value': 'Temps Moyen (s)', 'variable': 'Métrique', 'TASKTYPE': 'Type de Tâche'},
-                                                        barmode='group', color_discrete_sequence=px.colors.qualitative.Bold)
-                                st.plotly_chart(fig_task_perf, use_container_width=True)
-                            else:
-                                st.info("Pas de données valides pour les temps de performance des tâches après filtrage et sélection des 10 plus grandes valeurs (résultat vide ou zéro après division).")
-                        else:
-                            st.info("Pas de données valides pour les temps de performance des tâches après filtrage et sélection des 10 plus grandes valeurs (résultat intermédiaire vide).")
-                    else:
-                        st.info("Pas assez de données valides dans 'RESPTI' pour déterminer les Top 10 Types de Tâches après filtrage.")
+            st.subheader("Top 10 ENTRY_ID par Nombre d'Appels Physiques (PHYCALLS)") # Updated title
+            if 'ENTRY_ID' in df_tasktimes.columns and 'PHYCALLS' in df_tasktimes.columns and df_tasktimes['PHYCALLS'].sum() > 0:
+                df_tasktimes['PHYCALLS'] = pd.to_numeric(df_tasktimes['PHYCALLS'], errors='coerce').fillna(0).astype(float)
+                # TASKTYPE removal: Group by ENTRY_ID
+                top_task_phycalls = df_tasktimes.groupby('ENTRY_ID')['PHYCALLS'].sum().nlargest(10).reset_index()
+                if not top_task_phycalls.empty and top_task_phycalls['PHYCALLS'].sum() > 0:
+                    fig_phycalls = px.bar(top_task_phycalls, x='ENTRY_ID', y='PHYCALLS', # Changed x to ENTRY_ID
+                                         title="Top 10 ENTRY_ID par Nombre d'Appels Physiques", # Updated title
+                                         labels={'PHYCALLS': 'Nombre Total d\'Appels Physiques', 'ENTRY_ID': 'ID d\'Entrée'}, # Updated label
+                                         color='PHYCALLS', color_continuous_scale=px.colors.sequential.Greens)
+                    st.plotly_chart(fig_phycalls, use_container_width=True)
                 else:
-                    st.info("Pas de données valides pour les temps de performance des tâches après filtrage (la moyenne est vide ou non-numérique).")
+                    st.info("Pas de données valides pour les Top 10 ENTRY_ID par Appels Physiques après filtrage.")
             else:
-                st.info("Colonnes 'TASKTYPE', 'RESPTI' ou 'CPUTI' manquantes ou leur somme est zéro/vide après filtrage.")
-
-            st.subheader("Décomposition des Temps d'Attente et GUI par Type de Tâche")
-            st.markdown("""
-                Ce graphique détaille où le temps est passé au-delà du traitement CPU pour les tâches.
-                * **QUEUETI (Temps d'Attente en File)** : Temps passé par la tâche en attente dans une file d'attente. Un temps élevé peut indiquer une surcharge du système ou des goulots d'étranglement.
-                * **ROLLWAITTI (Temps d'Attente de Roll-in/out)** : Temps passé par la tâche en attente de chargement ou de déchargement de la mémoire (roll-in/out).
-                * **GUITIME (Temps GUI)** : Temps passé par la tâche dans l'interface graphique utilisateur.
-                * **GUINETTIME (Temps Réseau GUI)** : Temps passé sur le réseau pour les interactions de l'interface graphique utilisateur.
-                Ces métriques aident à identifier les causes de lenteur qui ne sont pas directement liées au CPU, comme les attentes de ressources ou les problèmes réseau.
-                """)
-            wait_gui_metrics = ['QUEUETI', 'ROLLWAITTI', 'GUITIME', 'GUINETTIME']
-            if 'TASKTYPE' in df_task.columns and all(col in df_task.columns for col in wait_gui_metrics) and df_task[wait_gui_metrics].sum().sum() > 0:
-                # Ensure numeric types here
-                for col in wait_gui_metrics:
-                    df_task[col] = pd.to_numeric(df_task[col], errors='coerce').fillna(0).astype(float)
-                df_wait_gui = df_task.groupby('TASKTYPE', as_index=False)[wait_gui_metrics].sum().nlargest(10, 'QUEUETI')
-                if not df_wait_gui.empty and df_wait_gui['QUEUETI'].sum() > 0:
-                    fig_wait_gui = px.bar(df_wait_gui, x='TASKTYPE',
-                                          y=wait_gui_metrics,
-                                          title="Temps d'Attente et GUI par Type de Tâche (Top 10)",
-                                          labels={'value': 'Temps (ms)', 'variable': 'Métrique de Temps', 'TASKTYPE': 'Type de Tâche'},
-                                          barmode='group', color_discrete_sequence=px.colors.qualitative.Pastel)
-                    st.plotly_chart(fig_wait_gui, use_container_width=True)
-                else:
-                    st.info("Données insuffisantes pour la décomposition des temps d'attente et GUI après filtrage.")
-            else:
-                st.info("Colonnes d'attente/GUI manquantes ou leurs sommes sont zéro/vides après filtrage.")
-
-            st.subheader("Analyse des Opérations d'E/S (Lectures/Écritures) par Type de Tâche")
-            st.markdown("""
-                Ce graphique fournit des détails sur les opérations d'entrée/sortie (E/S) spécifiques aux tâches.
-                * **READDIRCNT (Lectures Directes)** : Nombre de lectures directes d'enregistrements.
-                * **READSEQCNT (Lectures Séquentielles)** : Nombre de lectures séquentielles d'enregistrements.
-                * **CHNGCNT (Changements)** : Nombre de changements (écritures) d'enregistrements.
-                * **PHYREADCNT (Lectures Physiques)** : Nombre total de lectures physiques (sur le disque).
-                * **PHYCHNGREC (Changements Physiques)** : Nombre total d'enregistrements physiquement modifiés.
-                * **READDIRREC (Enregistrements Lus Directement)** : Nombre d'enregistrements lus directement.
-                Ces métriques sont essentielles pour identifier les tâches gourmandes en E/S et évaluer l'efficacité de l'accès aux données.
-                """)
-            # FIX: Added 'READDIRREC' to the list so it's available for nlargest
-            io_metrics_tasktimes = ['READDIRCNT', 'READSEQCNT', 'CHNGCNT', 'PHYREADCNT', 'PHYCHNGREC', 'READDIRREC']
-            if 'TASKTYPE' in df_task.columns and all(col in df_task.columns for col in io_metrics_tasktimes) and df_task[io_metrics_tasktimes].sum().sum() > 0:
-                # Ensure numeric types here
-                for col in io_metrics_tasktimes:
-                    df_task[col] = pd.to_numeric(df_task[col], errors='coerce').fillna(0).astype(float)
-                df_io_tasktimes = df_task.groupby('TASKTYPE', as_index=False)[io_metrics_tasktimes].sum().nlargest(10, 'READDIRREC')
-                if not df_io_tasktimes.empty and df_io_tasktimes['READDIRREC'].sum() > 0:
-                    fig_io_tasktimes = px.bar(df_io_tasktimes, x='TASKTYPE', y=io_metrics_tasktimes,
-                                              title="Opérations d'E/S par Type de Tâche (Top 10)",
-                                              labels={'value': 'Nombre d\'Opérations', 'variable': 'Métrique E/S', 'TASKTYPE': 'Type de Tâche'},
-                                              barmode='group', color_discrete_sequence=px.colors.sequential.Greens)
-                    st.plotly_chart(fig_io_tasktimes, use_container_width=True)
-                else:
-                    st.info("Données insuffisantes pour l'analyse des opérations d'E/S après filtrage.")
-            else:
-                pass
+                st.info("Colonnes 'ENTRY_ID' ou 'PHYCALLS' manquantes ou PHYCALLS total est zéro/vide après filtrage.")
+            
+            # TASKTYPE removal: Removed "Distribution des Comptes par Type de Tâche"
+            # This section specifically relied on TASKTYPE. Without it, the "distribution of accounts by task type" makes no sense.
+            # st.subheader("Distribution des Comptes par Type de Tâche")
+            # st.markdown(...)
+            # if 'TASKTYPE' in df_tasktimes.columns and 'ACCOUNT' in df_tasktimes.columns:
+            #     if 'ACCOUNT' in df_tasktimes.columns:
+            #         tasktype_account_counts = df_tasktimes.groupby(['TASKTYPE', 'ACCOUNT']).size().reset_index(name='COUNT')
+            #         top_tasktypes_for_hist = df_tasktimes['TASKTYPE'].value_counts().nlargest(5).index.tolist()
+            #         tasktype_account_counts_filtered = tasktype_account_counts[tasktype_account_counts['TASKTYPE'].isin(top_tasktypes_for_hist)]
+            #         if not tasktype_account_counts_filtered.empty:
+            #             fig_tasktype_account_dist = px.bar(tasktype_account_counts_filtered, x='ACCOUNT', y='COUNT',
+            #                                                color='TASKTYPE', barmode='group',
+            #                                                title="Distribution des Comptes par Type de Tâche (Top 5 TASKTYPE)",
+            #                                                labels={'ACCOUNT': 'Compte Utilisateur', 'COUNT': 'Nombre d\'Occurrences', 'TASKTYPE': 'Type de Tâche'},
+            #                                                color_discrete_sequence=px.colors.qualitative.Dark24)
+            #             st.plotly_chart(fig_tasktype_account_dist, use_container_width=True)
+            #         else:
+            #             st.info("Pas de données valides pour la distribution des comptes par type de tâche après filtrage.")
+            #     else:
+            #         st.info("La colonne 'ACCOUNT' est manquante dans les données TASKTIMES. Impossible d'afficher la distribution des comptes par type de tâche.")
+            # else:
+            #     st.info("Colonnes 'TASKTYPE' ou 'ACCOUNT' manquantes dans les données TASKTIMES.")
 
 
-            st.subheader("Aperçu des Données des Temps de Tâches Filtrées")
-            st.dataframe(df_task.head())
-        else:
-            st.warning("Données des temps de tâches non disponibles ou filtrées à vide.")
 
 
     elif st.session_state.current_section == "Insights Hitlist DB":
-        # --- NOUVEL ONGLET: Insights Détaillés de la Base de Données (Hitlist DB) ---
-        st.header("🔍 Insights Détaillés de la Base de Données (Hitlist DB)")
+        # --- Onglet 5: Insights Hitlist DB (HITLIST_DATABASE_final_cleaned_clean.xlsx) ---
+        st.header("🔍 Insights de la Base de Données (Hitlist)")
         df_hitlist = dfs['hitlist_db'].copy()
-        
-        # Appliquer les filtres globaux si disponibles
         if selected_accounts:
-            if 'ACCOUNT' in df_hitlist.columns:
-                df_hitlist = df_hitlist[df_hitlist['ACCOUNT'].isin(selected_accounts)]
-            else:
-                st.warning("La colonne 'ACCOUNT' est manquante dans les données Hitlist DB pour le filtrage.")
+            df_hitlist = df_hitlist[df_hitlist['ACCOUNT'].isin(selected_accounts)]
         if selected_reports:
-            if 'REPORT' in df_hitlist.columns:
-                df_hitlist = df_hitlist[df_hitlist['REPORT'].isin(selected_reports)]
-            else:
-                st.warning("La colonne 'REPORT' est manquante dans les données Hitlist DB pour le filtrage.")
-        if selected_tasktypes:
-            if 'TASKTYPE' in df_hitlist.columns:
-                df_hitlist = df_hitlist[df_hitlist['TASKTYPE'].isin(selected_tasktypes)]
-            else:
-                st.warning("La colonne 'TASKTYPE' est manquante dans les données Hitlist DB pour le filtrage.")
+            df_hitlist = df_hitlist[df_hitlist['REPORT'].isin(selected_reports)]
+        # TASKTYPE removal: Removed if selected_tasktypes filter for df_hitlist
+        # if selected_tasktypes:
+        #     df_hitlist = df_hitlist[df_hitlist['TASKTYPE'].isin(selected_tasktypes)]
 
         if not df_hitlist.empty:
-            st.subheader("Top 10 Rapports par Temps de Réponse Moyen (RESPTI)")
-            if 'REPORT' in df_hitlist.columns and 'RESPTI' in df_hitlist.columns and df_hitlist['RESPTI'].sum() > 0:
-                df_hitlist['RESPTI'] = pd.to_numeric(df_hitlist['RESPTI'], errors='coerce').fillna(0).astype(float)
-                top_reports_resp = df_hitlist.groupby('REPORT', as_index=False)['RESPTI'].mean().nlargest(10, 'RESPTI')
-                if not top_reports_resp.empty and top_reports_resp['RESPTI'].sum() > 0:
-                    fig_top_reports_resp = px.bar(top_reports_resp,
-                                                  x='REPORT', y='RESPTI',
-                                                  title="Top 10 Rapports par Temps de Réponse Moyen (ms)",
-                                                  labels={'RESPTI': 'Temps de Réponse Moyen (ms)', 'REPORT': 'Rapport'},
-                                                  color='RESPTI', color_continuous_scale=px.colors.sequential.Sunset)
-                    st.plotly_chart(fig_top_reports_resp, use_container_width=True)
-                else:
-                    st.info("Pas de données valides pour les Top 10 Rapports par Temps de Réponse Moyen après filtrage.")
-            else:
-                st.info("Colonnes 'REPORT' ou 'RESPTI' manquantes ou RESPTI total est zéro/vide après filtrage.")
+            st.subheader("Temps de Réponse (RESPTI) et Temps CPU (CPUTI) par Rapport")
+            st.markdown("""
+Cette analyse est importante pour identifier les rapports les plus coûteux en termes de performance et comprendre la nature de cette charge. 
+            """)
 
-            st.subheader("Top 10 Comptes par Nombre d'Appels Base de Données (DBCALLS)")
-            if 'ACCOUNT' in df_hitlist.columns and 'DBCALLS' in df_hitlist.columns and df_hitlist['DBCALLS'].sum() > 0:
+            if all(col in df_hitlist.columns for col in ['REPORT', 'RESPTI', 'CPUTI']) and df_hitlist['RESPTI'].sum() > 0 and df_hitlist['CPUTI'].sum() > 0:
+                df_hitlist['RESPTI'] = pd.to_numeric(df_hitlist['RESPTI'], errors='coerce').fillna(0).astype(float)
+                df_hitlist['CPUTI'] = pd.to_numeric(df_hitlist['CPUTI'], errors='coerce').fillna(0).astype(float)
+                report_times = df_hitlist.groupby('REPORT')[['RESPTI', 'CPUTI']].mean().reset_index().nlargest(10, 'RESPTI')
+                if not report_times.empty and report_times[['RESPTI', 'CPUTI']].sum().sum() > 0:
+                    fig_report_times = px.bar(report_times, x='REPORT', y=['RESPTI', 'CPUTI'],
+                                              title="Temps de Réponse et Temps CPU Moyens par Rapport (Top 10 RESPTI)",
+                                              labels={'value': 'Temps Moyen (ms)', 'variable': 'Métrique', 'REPORT': 'Nom du Rapport'},
+                                              barmode='group', color_discrete_sequence=px.colors.qualitative.Vivid)
+                    st.plotly_chart(fig_report_times, use_container_width=True)
+                else:
+                    st.info("Pas de données valides pour les temps de réponse et CPU par rapport après filtrage.")
+            else:
+                st.info("Colonnes 'REPORT', 'RESPTI' ou 'CPUTI' manquantes ou leurs totaux sont zéro/vide après filtrage.")
+
+            st.subheader("Nombre d'Appels Base de Données (DBCALLS) par Rapport")
+            st.markdown("""
+DBCALLS (Appels Base de Données) est une métrique qui représente le nombre de fois qu'un programme ou une transaction interagit avec la base de données (lectures, écritures, mises à jour, suppressions).
+
+Cette visualisation est essentielle pour identifier les rapports qui génèrent la plus grande charge sur la base de données.
+            """)
+            if 'REPORT' in df_hitlist.columns and 'DBCALLS' in df_hitlist.columns and df_hitlist['DBCALLS'].sum() > 0:
                 df_hitlist['DBCALLS'] = pd.to_numeric(df_hitlist['DBCALLS'], errors='coerce').fillna(0).astype(float)
-                top_accounts_db_calls = df_hitlist.groupby('ACCOUNT', as_index=False)['DBCALLS'].sum().nlargest(10, 'DBCALLS')
-                if not top_accounts_db_calls.empty and top_accounts_db_calls['DBCALLS'].sum() > 0:
-                    fig_top_accounts_db_calls = px.bar(top_accounts_db_calls,
-                                                       x='ACCOUNT', y='DBCALLS',
-                                                       title="Top 10 Comptes par Nombre d'Appels Base de Données",
-                                                       labels={'DBCALLS': 'Nombre Total d\'Appels DB', 'ACCOUNT': 'Compte Utilisateur'},
-                                                       color='DBCALLS', color_continuous_scale=px.colors.sequential.Mint)
-                    st.plotly_chart(fig_top_accounts_db_calls, use_container_width=True)
+                report_db_calls = df_hitlist.groupby('REPORT')['DBCALLS'].sum().reset_index().nlargest(10, 'DBCALLS')
+                if not report_db_calls.empty and report_db_calls['DBCALLS'].sum() > 0:
+                    fig_report_db_calls = px.bar(report_db_calls, x='REPORT', y='DBCALLS',
+                                                 title="Nombre Total d'Appels Base de Données par Rapport (Top 10)",
+                                                 labels={'DBCALLS': 'Total Appels DB', 'REPORT': 'Nom du Rapport'},
+                                                 color='DBCALLS', color_continuous_scale=px.colors.sequential.Teal)
+                    st.plotly_chart(fig_report_db_calls, use_container_width=True)
                 else:
-                    st.info("Pas de données valides pour les Top 10 Comptes par Nombre d'Appels Base de Données après filtrage.")
+                    st.info("Pas de données valides pour le nombre d'appels DB par rapport après filtrage.")
             else:
-                st.info("Colonnes 'ACCOUNT' ou 'DBCALLS' manquantes ou DBCALLS total est zéro/vide après filtrage.")
+                st.info("Colonnes 'REPORT' ou 'DBCALLS' manquantes ou DBCALLS total est zéro/vide après filtrage.")
 
-            st.subheader("Distribution du Temps de Réponse (RESPTI) - Courbe de Densité")
-            if 'RESPTI' in df_hitlist.columns and df_hitlist['RESPTI'].sum() > 0:
-                df_hitlist['RESPTI'] = pd.to_numeric(df_hitlist['RESPTI'], errors='coerce').fillna(0).astype(float)
-                if df_hitlist['RESPTI'].nunique() > 1:
-                    fig_dist_resp_time = ff.create_distplot([df_hitlist['RESPTI'].dropna()], ['RESPTI'],
-                                                            bin_size=df_hitlist['RESPTI'].std()/5 if df_hitlist['RESPTI'].std() > 0 else 1,
-                                                            show_rug=False, show_hist=False)
-                    fig_dist_resp_time.update_layout(title_text="Distribution du Temps de Réponse (RESPTI)",
-                                                     xaxis_title='Temps de Réponse (ms)',
-                                                     yaxis_title='Densité')
-                    fig_dist_resp_time.data[0].line.color = 'darkred'
-                    st.plotly_chart(fig_dist_resp_time, use_container_width=True)
-                else:
-                    st.info("La colonne 'RESPTI' contient des valeurs uniques ou est vide après filtrage, impossible de créer une courbe de densité.")
-            else:
-                st.info("Colonne 'RESPTI' manquante ou total est zéro/vide après filtrage.")
-
-            # --- DÉBUT DU BLOC SUPPRIMÉ ---
-            # st.subheader("Corrélation entre Temps de Réponse (RESPTI) et Temps CPU (CPUTI)")
-            # if 'RESPTI' in df_hitlist.columns and 'CPUTI' in df_hitlist.columns and df_hitlist['RESPTI'].sum() > 0 and df_hitlist['CPUTI'].sum() > 0:
+            # TASKTYPE removal: Removed "Distribution du Temps de Réponse (RESPTI) par Type de Tâche"
+            # This section explicitly used TASKTYPE as a categorical variable for violin plots.
+            # Without it, a general distribution of RESPTI is covered by other sections, or would need a different grouping.
+            # st.subheader("Distribution du Temps de Réponse (RESPTI) par Type de Tâche")
+            # if 'TASKTYPE' in df_hitlist.columns and 'RESPTI' in df_hitlist.columns and df_hitlist['RESPTI'].sum() > 0:
             #     df_hitlist['RESPTI'] = pd.to_numeric(df_hitlist['RESPTI'], errors='coerce').fillna(0).astype(float)
-            #     df_hitlist['CPUTI'] = pd.to_numeric(df_hitlist['CPUTI'], errors='coerce').fillna(0).astype(float)
-            #     fig_resp_cpu_hitlist = px.scatter(df_hitlist, x='CPUTI', y='RESPTI',
-            #                                       title="Temps de Réponse vs. Temps CPU (Hitlist DB)",
-            #                                       labels={'CPUTI': 'Temps CPU (ms)', 'RESPTI': 'Temps de Réponse (ms)'},
-            #                                       hover_data=['ACCOUNT', 'REPORT', 'TASKTYPE'],
-            #                                       color='TASKTYPE' if 'TASKTYPE' in df_hitlist.columns else None,
-            #                                       log_x=True,
-            #                                       log_y=True,
-            #                                       color_discrete_sequence=px.colors.qualitative.Plotly)
-            #     st.plotly_chart(fig_resp_cpu_hitlist, use_container_width=True)
+            #     tasktype_counts = df_hitlist['TASKTYPE'].value_counts()
+            #     tasktypes_to_plot = tasktype_counts[tasktype_counts >= 5].index.tolist()
+            #     if tasktypes_to_plot:
+            #         df_hitlist_filtered_for_violin = df_hitlist[df_hitlist['TASKTYPE'].isin(tasktypes_to_plot)].copy()
+            #         fig_resp_dist_tasktype = px.violin(df_hitlist_filtered_for_violin, y='RESPTI', x='TASKTYPE',
+            #                                            title="Distribution du Temps de Réponse (RESPTI) par Type de Tâche",
+            #                                            labels={'RESPTI': 'Temps de Réponse (ms)', 'TASKTYPE': 'Type de Tâche'},
+            #                                            box=True,
+            #                                            points="outliers",
+            #                                            color='TASKTYPE', color_discrete_sequence=px.colors.qualitative.G10)
+            #         st.plotly_chart(fig_resp_dist_tasktype, use_container_width=True)
+            #     else:
+            #         st.info("Pas assez de données pour créer des distributions de temps de réponse significatives par type de tâche après filtrage (moins de 5 entrées par type de tâche).")
             # else:
-            #     st.info("Colonnes 'RESPTI' ou 'CPUTI' manquantes ou leurs totaux sont zéro/vides après filtrage pour la corrélation.")
-            # --- FIN DU BLOC SUPPRIMÉ ---
+            #     st.info("Colonnes 'TASKTYPE' ou 'RESPTI' manquantes ou RESPTI total est zéro/vide après filtrage.")
 
-            st.subheader("Tendance du Temps de Réponse Moyen par Heure (Hitlist DB)")
-            if 'FULL_DATETIME' in df_hitlist.columns and pd.api.types.is_datetime64_any_dtype(df_hitlist['FULL_DATETIME']) and not df_hitlist['FULL_DATETIME'].isnull().all() and 'RESPTI' in df_hitlist.columns and df_hitlist['RESPTI'].sum() > 0:
-                df_hitlist['RESPTI'] = pd.to_numeric(df_hitlist['RESPTI'], errors='coerce').fillna(0).astype(float)
-                hourly_resp_time_hitlist = df_hitlist.set_index('FULL_DATETIME')['RESPTI'].resample('H').mean().dropna() / 1000.0
-                if not hourly_resp_time_hitlist.empty:
-                    fig_hourly_resp_hitlist = px.line(hourly_resp_time_hitlist.reset_index(), x='FULL_DATETIME', y='RESPTI',
-                                                      title="Tendance du Temps de Réponse Moyen par Heure (s) - Hitlist DB",
-                                                      labels={'FULL_DATETIME': 'Heure', 'RESPTI': 'Temps de Réponse Moyen (s)'},
-                                                      color_discrete_sequence=['blue'])
-                    fig_hourly_resp_hitlist.update_xaxes(dtick="H1", tickformat="%H:%M")
-                    st.plotly_chart(fig_hourly_resp_hitlist, use_container_width=True)
+            # New section: Top 10 Accounts by Total ROLLOUTCNT
+            st.subheader("Top 10 Comptes par Nombre Total de 'Roll Outs' (ROLLOUTCNT)")
+            st.markdown("""
+                Le 'roll-out' fait référence au processus où l'état d'un processus de travail est temporairement écrit sur le disque (dans la zone de roll ou de page)
+                pour libérer de la mémoire pour d'autres processus. Un nombre élevé de 'roll-outs' peut indiquer une pression mémoire,
+                où le système manque de mémoire suffisante pour garder tous les contextes des utilisateurs en mémoire vive.
+                Cela peut avoir un impact négatif sur les performances.
+                """)
+            if 'ACCOUNT' in df_hitlist.columns and 'ROLLOUTCNT' in df_hitlist.columns and df_hitlist['ROLLOUTCNT'].sum() > 0:
+                df_hitlist['ROLLOUTCNT'] = pd.to_numeric(df_hitlist['ROLLOUTCNT'], errors='coerce').fillna(0).astype(float)
+                top_accounts_rollout = df_hitlist.groupby('ACCOUNT')['ROLLOUTCNT'].sum().nlargest(10).reset_index()
+                if not top_accounts_rollout.empty and top_accounts_rollout['ROLLOUTCNT'].sum() > 0:
+                    fig_rollout_accounts = px.bar(top_accounts_rollout, x='ACCOUNT', y='ROLLOUTCNT',
+                                                  title="Top 10 Comptes par Total des 'Roll Outs'",
+                                                  labels={'ROLLOUTCNT': 'Total Roll Outs', 'ACCOUNT': 'Compte Utilisateur'},
+                                                  color='ROLLOUTCNT', color_continuous_scale=px.colors.sequential.Reds)
+                    st.plotly_chart(fig_rollout_accounts, use_container_width=True)
                 else:
-                    st.info("Pas de données valides pour la tendance horaire du temps de réponse après filtrage.")
+                    st.info("Pas de données valides pour les Top 10 Comptes par 'Roll Outs' après filtrage.")
             else:
-                st.info("Colonnes 'FULL_DATETIME' ou 'RESPTI' manquantes/invalides ou RESPTI total est zéro/vide après filtrage pour la tendance.")
+                st.info("Colonnes 'ACCOUNT' ou 'ROLLOUTCNT' manquantes ou ROLLOUTCNT total est zéro/vide après filtrage.")
 
             st.subheader("Aperçu des Données Hitlist DB Filtrées")
-            st.dataframe(df_hitlist.head())
+            # TASKTYPE removal: Ensure TASKTYPE is not in this display list
+            columns_to_display_hitlist = [col for col in df_hitlist.columns if col not in ['TASKTYPE']]
+            st.dataframe(df_hitlist[columns_to_display_hitlist].head())
         else:
             st.warning("Données Hitlist DB non disponibles ou filtrées à vide.")
 
@@ -1175,6 +1306,8 @@ else:
 
         if not df_perf.empty:
             st.subheader("Distribution du Temps CPU des Processus de Travail (en secondes)")
+            st.markdown("""
+ Cette visualisation  aide à voir si le CPU est principalement utilisé par de nombreuses petites tâches rapides ou s'il est occasionnellement saturé par quelques opérations très lourdes          """)
             if 'WP_CPU_SECONDS' in df_perf.columns and df_perf['WP_CPU_SECONDS'].sum() > 0:
                 # Ensure WP_CPU_SECONDS is numeric here
                 df_perf['WP_CPU_SECONDS'] = pd.to_numeric(df_perf['WP_CPU_SECONDS'], errors='coerce').fillna(0).astype(float)
@@ -1191,22 +1324,15 @@ else:
                     st.info("La colonne 'WP_CPU_SECONDS' contient des valeurs uniques ou est vide après filtrage, impossible de créer une courbe de densité.")
             else:
                 st.info("Colonne 'WP_CPU_SECONDS' manquante ou total est zéro/vide après filtrage.")
+            st.markdown("""
+L'observation la plus frappante est le pic très prononcé au début de la courbe, indiquant que la grande majorité des processus de travail SAP consomment très peu de temps CPU. Cela signifie que la plupart des opérations sont rapides et efficaces en termes d'utilisation du processeur.
+            """)
 
-            st.subheader("Répartition des Processus de Travail par Statut (WP_STATUS)")
-            if 'WP_STATUS' in df_perf.columns and not df_perf['WP_STATUS'].empty:
-                status_counts = df_perf['WP_STATUS'].value_counts().reset_index()
-                status_counts.columns = ['Statut', 'Count']
-                if not status_counts.empty and status_counts['Count'].sum() > 0:
-                    fig_status_pie = px.pie(status_counts, values='Count', names='Statut',
-                                            title="Répartition des Processus de Travail par Statut",
-                                            hole=0.3, color_discrete_sequence=px.colors.qualitative.Pastel)
-                    st.plotly_chart(fig_status_pie, use_container_width=True)
-                else:
-                    st.info("Pas de données valides pour la répartition par statut des processus de travail après filtrage.")
-            else:
-                st.info("Colonne 'WP_STATUS' manquante ou vide après filtrage.")
 
             st.subheader("Nombre de Processus de Travail par Type (WP_TYP)")
+            st.markdown("""
+ce graphique est une "carte" des ressources de traitement du système SAP, essentielle pour s'assurer que le bon nombre de processus est disponible pour chaque type d'activité. 
+            """)
             if 'WP_TYP' in df_perf.columns and not df_perf['WP_TYP'].empty:
                 type_counts = df_perf['WP_TYP'].value_counts().reset_index()
                 type_counts.columns = ['Type', 'Count']
@@ -1222,36 +1348,35 @@ else:
                 st.info("Colonne 'WP_TYP' manquante ou vide après filtrage.")
 
             st.subheader("Temps CPU Moyen par Type de Processus de Travail (en secondes)")
+            st.markdown("""
+Ce graphique à barres présente le temps CPU moyen consommé par chaque type de processus de travail SAP. Contrairement au graphique précédent qui montrait le nombre de processus, celui-ci indique leur intensité d'utilisation du processeur.
+            """)            
             if 'WP_TYP' in df_perf.columns and 'WP_CPU_SECONDS' in df_perf.columns and df_perf['WP_CPU_SECONDS'].sum() > 0:
                 # Ensure WP_CPU_SECONDS is numeric here
                 df_perf['WP_CPU_SECONDS'] = pd.to_numeric(df_perf['WP_CPU_SECONDS'], errors='coerce').fillna(0).astype(float)
                 avg_cpu_by_type = df_perf.groupby('WP_TYP', as_index=False)['WP_CPU_SECONDS'].mean()
+                
+                # --- MODIFICATION ICI : Trier le DataFrame par WP_CPU_SECONDS en ordre décroissant ---
+                avg_cpu_by_type = avg_cpu_by_type.sort_values(by='WP_CPU_SECONDS', ascending=False)
                 if not avg_cpu_by_type.empty and avg_cpu_by_type['WP_CPU_SECONDS'].sum() > 0:
                     fig_avg_cpu_type = px.bar(avg_cpu_by_type, x='WP_TYP', y='WP_CPU_SECONDS',
                                                 title="Temps CPU Moyen par Type de Processus de Travail",
                                                 labels={'WP_TYP': 'Type de Processus', 'WP_CPU_SECONDS': 'Temps CPU Moyen (s)'},
                                                 color='WP_CPU_SECONDS', color_continuous_scale=px.colors.sequential.Plasma)
+                    
+                    # --- MODIFICATION ICI : Mettre à jour l'axe des X pour respecter l'ordre trié ---
+                    fig_avg_cpu_type.update_xaxes(
+                        categoryorder='array', # Specify that the order is given by an array
+                        categoryarray=avg_cpu_by_type['WP_TYP'].tolist() # Use the sorted WP_TYP values
+                    )
+                    
                     st.plotly_chart(fig_avg_cpu_type, use_container_width=True)
                 else:
                     st.info("Pas de données valides pour le temps CPU moyen par type de processus de travail après filtrage.")
             else:
                 st.info("Colonnes 'WP_TYP' ou 'WP_CPU_SECONDS' manquantes ou total est zéro/vide après filtrage.")
 
-            st.subheader("Nombre Total de Redémarrages par Type de Processus de Travail (WP_IRESTRT)")
-            if 'WP_TYP' in df_perf.columns and 'WP_IRESTRT' in df_perf.columns and df_perf['WP_IRESTRT'].sum() > 0:
-                # Ensure WP_IRESTRT is numeric here
-                df_perf['WP_IRESTRT'] = pd.to_numeric(df_perf['WP_IRESTRT'], errors='coerce').fillna(0).astype(float)
-                restarts_by_type = df_perf.groupby('WP_TYP', as_index=False)['WP_IRESTRT'].sum().nlargest(10, 'WP_IRESTRT')
-                if not restarts_by_type.empty and restarts_by_type['WP_IRESTRT'].sum() > 0:
-                    fig_restarts_type = px.bar(restarts_by_type, x='WP_TYP', y='WP_IRESTRT',
-                                                title="Nombre Total de Redémarrages par Type de Processus de Travail",
-                                                labels={'WP_TYP': 'Type de Processus', 'WP_IRESTRT': 'Nombre Total de Redémarrages'},
-                                                color='WP_IRESTRT', color_continuous_scale=px.colors.sequential.OrRd)
-                    st.plotly_chart(fig_restarts_type, use_container_width=True)
-                else:
-                    st.info("Pas de données valides pour le nombre de redémarrages par type de processus de travail après filtrage.")
-            else:
-                st.info("Colonnes 'WP_TYP' ou 'WP_IRESTRT' manquantes ou total est zéro/vide après filtrage.")
+
 
             st.subheader("Aperçu des Données de Performance Filtrées")
             st.dataframe(df_perf.head())
@@ -1286,53 +1411,8 @@ else:
             else:
                 st.info("Colonnes 'SQLSTATEM' ou 'EXECTIME' manquantes ou leur total est zéro/vide après filtrage.")
 
-            st.subheader("Top 10 Requêtes SQL par Nombre Total d'Exécutions (TOTALEXEC)")
-            st.markdown("""
-                Ce graphique met en évidence les 10 requêtes SQL les plus fréquemment exécutées.
-                Il est utile pour identifier les requêtes qui, même si elles ne sont pas individuellement lentes,
-                peuvent avoir un impact significatif sur la performance globale en raison de leur volume d'exécution élevé.
-                """)
-            if 'SQLSTATEM' in df_sql_trace.columns and 'TOTALEXEC' in df_sql_trace.columns and df_sql_trace['TOTALEXEC'].sum() > 0:
-                # Ensure TOTALEXEC is numeric here
-                df_sql_trace['TOTALEXEC'] = pd.to_numeric(df_sql_trace['TOTALEXEC'], errors='coerce').fillna(0).astype(float)
-                top_sql_by_totalexec = df_sql_trace.groupby('SQLSTATEM', as_index=False)['TOTALEXEC'].sum().nlargest(10, 'TOTALEXEC')
-                top_sql_by_totalexec['SQLSTATEM_SHORT'] = top_sql_by_totalexec['SQLSTATEM'].apply(lambda x: x[:70] + '...' if len(x) > 70 else x)
-                if not top_sql_by_totalexec.empty and top_sql_by_totalexec['TOTALEXEC'].sum() > 0:
-                    fig_top_sql_totalexec = px.bar(top_sql_by_totalexec, y='SQLSTATEM_SHORT', x='TOTALEXEC', orientation='h',
-                                                    title="Top 10 Requêtes SQL par Nombre Total d'Exécutions",
-                                                    labels={'SQLSTATEM_SHORT': 'Instruction SQL', 'TOTALEXEC': 'Nombre Total d\'Exécutions'},
-                                                    color='TOTALEXEC', color_continuous_scale=px.colors.sequential.Greens)
-                    fig_top_sql_totalexec.update_yaxes(autorange="reversed")
-                    st.plotly_chart(fig_top_sql_totalexec, use_container_width=True)
-                else:
-                    st.info("Pas de données valides pour les Top 10 Requêtes SQL par Nombre Total d'Exécutions après filtrage.")
-            else:
-                st.info("Colonnes 'SQLSTATEM' ou 'TOTALEXEC' manquantes ou leur total est zéro/vide après filtrage.")
 
-            st.subheader("Distribution du Temps par Exécution (TIMEPEREXE)")
-            st.markdown("""
-                Cette courbe de densité montre la répartition des temps d'exécution individuels par requête.
-                Elle permet de comprendre si la plupart des exécutions sont rapides ou si certaines sont significativement plus lentes,
-                indiquant des performances inégales.
-                """)
-            if 'TIMEPEREXE' in df_sql_trace.columns and df_sql_trace['TIMEPEREXE'].sum() > 0:
-                # Ensure TIMEPEREXE is numeric here
-                df_sql_trace['TIMEPEREXE'] = pd.to_numeric(df_sql_trace['TIMEPEREXE'], errors='coerce').fillna(0).astype(float)
-                if df_sql_trace['TIMEPEREXE'].nunique() > 1:
-                    fig_time_per_exe_dist = ff.create_distplot([df_sql_trace['TIMEPEREXE'].dropna()], ['TIMEPEREXE'],
-                                                                bin_size=df_sql_trace['TIMEPEREXE'].std()/5 if df_sql_trace['TIMEPEREXE'].std() > 0 else 1,
-                                                                show_rug=False, show_hist=False)
-                    fig_time_per_exe_dist.update_layout(title_text="Distribution du Temps par Exécution",
-                                                        xaxis_title='Temps par Exécution',
-                                                        yaxis_title='Densité')
-                    fig_time_per_exe_dist.data[0].line.color = 'darkgreen'
-                    st.plotly_chart(fig_time_per_exe_dist, use_container_width=True)
-                else:
-                    st.info("La colonne 'TIMEPEREXE' contient des valeurs uniques ou est vide après filtrage, impossible de créer une courbe de densité.")
-            else:
-                st.info("Colonne 'TIMEPEREXE' manquante ou total est zéro/vide après filtrage.")
-
-            st.subheader("Distribution du Temps Moyen par Enregistrement (AVGTPERREC) pour le serveur 'ECC-VE7-00'")
+            st.subheader("Distribution du Temps Moyen par Enregistrement (AVGTPERREC : Average Processing Time per Database Record values) pour le serveur 'ECC-VE7-00'")
             st.markdown("""
                 Cette courbe de densité montre la répartition du temps moyen par enregistrement spécifiquement pour le serveur "ECC-VE7-00".
                 Elle permet d'analyser la cohérence des performances de ce serveur en termes de traitement des enregistrements.
@@ -1360,6 +1440,11 @@ else:
                     st.info("Aucune donnée valide pour le serveur 'ECC-VE7-00' ou la colonne 'AVGTPERREC' est vide/zéro après filtrage.")
             else:
                 st.info("Colonnes 'SERVERNAME' ou 'AVGTPERREC' manquantes dans les données de traces SQL.")
+            st.markdown("""
+La courbe montre un pic très prononcé à des valeurs faibles de AVGTPERREC (proches de 0). Cela signifie que la majorité des opérations sur le serveur 'ECC-VE7-00' traitent les enregistrements très rapidement et efficacement. C'est un indicateur positif de la performance de base de données et du traitement des données sur ce serveur.
+
+La "longue queue" vers des valeurs AVGTPERREC plus élevées indique qu'il existe quelques opérations qui, bien que moins fréquentes, prennent beaucoup plus de temps pour traiter chaque enregistrement.
+                """)
 
             st.subheader("Top 10 Requêtes SQL par Temps Moyen par Exécution (TIMEPEREXE)")
             st.markdown("""
@@ -1468,62 +1553,46 @@ else:
                 st.info("Aucune donnée de date de dernier logon valide après filtrage.")
 
             # NOUVEAU BLOC : Utilisateurs sans Dernier Logon Récent
-            st.subheader("Utilisateurs sans Dernier Logon Récent (GLTGB_DATE)")
-            if 'GLTGB_DATE' in df_usr02.columns and pd.api.types.is_datetime64_any_dtype(df_usr02['GLTGB_DATE']):
-                # Correction pour s'assurer que current_date est un objet datetime.date pour comparaison
-                # C'est implicitement géré par pd.Timestamp.now().date() puis pd.to_datetime
-                current_date = pd.to_datetime(pd.Timestamp.now().date())
-                inactive_threshold_months = st.slider("Considérer inactif si pas de logon depuis (mois):", 1, 24, 6)
-                
-                inactive_date = current_date - pd.DateOffset(months=inactive_threshold_months)
-                
-                inactive_users = df_usr02[df_usr02['GLTGB_DATE'] < inactive_date]
+            st.subheader("Utilisateurs sans Date de Dernier Logon Enregistrée")
+            st.markdown("""
+                Cette section affiche les utilisateurs dont la date du dernier logon (`GLTGB_DATE`) est enregistrée comme '00000000', 
+                ce qui signifie qu'ils n'ont pas de date de dernier logon valide ou enregistrée dans le système SAP. 
+                Cela peut indiquer des comptes inutilisés ou des problèmes de données.
+            """)
+            
+            # Assurez-vous que df_usr02 est le DataFrame correct chargé depuis 'usr02_data.xlsx'
+            df_usr02_filtered = dfs.get("usr02", pd.DataFrame())
 
-                if not inactive_users.empty:
-                    st.warning(f"🚨 **{len(inactive_users)}** utilisateurs n'ont pas effectué de logon depuis le {inactive_date.strftime('%Y-%m-%d')}.")
-                    st.dataframe(inactive_users[['BNAME', 'GLTGB_DATE', 'USTYP']].sort_values(by='GLTGB_DATE'))
-                    
-                    # Graphique des logons par date pour les utilisateurs inactifs
-                    logon_dates = inactive_users['GLTGB_DATE'].value_counts().sort_index().reset_index()
-                    logon_dates.columns = ['GLTGB_DATE', 'Count']
-                    
-                    # Filtrer les dates avant '1900-01-01' pour éviter les problèmes de visualisation de très vieilles dates
-                    logon_dates = logon_dates[logon_dates['GLTGB_DATE'] > '1900-01-01']
+            if 'GLTGB_DATE' in df_usr02_filtered.columns and pd.api.types.is_datetime64_any_dtype(df_usr02_filtered['GLTGB_DATE']):
+                # Filtrer les utilisateurs où GLTGB_DATE est NaT (correspondant à '00000000' après traitement)
+                users_no_logon_date = df_usr02_filtered[df_usr02_filtered['GLTGB_DATE'].isna()]
 
-                    if not logon_dates.empty and logon_dates['Count'].sum() > 0:
-                        fig_logon_dates = px.line(logon_dates, x='GLTGB_DATE', y='Count', 
-                                                title=f"Distribution des Derniers Logons pour Utilisateurs Inactifs (depuis {inactive_threshold_months} mois)",
-                                                labels={'GLTGB_DATE': 'Date de Dernier Logon', 'Count': 'Nombre d\'Utilisateurs'},
-                                                color_discrete_sequence=['red'])
-                        fig_logon_dates.update_xaxes(
-                            rangeselector=dict(
-                                buttons=list([
-                                    dict(count=1, label="1m", step="month", stepmode="backward"),
-                                    dict(count=6, label="6m", step="month", stepmode="backward"),
-                                    dict(count=1, label="1y", step="year", stepmode="backward"),
-                                    dict(step="all")
-                                ])
-                            ),
-                            rangeslider=dict(visible=True),
-                            type="date"
-                        )
-                        
-                        st.plotly_chart(fig_logon_dates, use_container_width=True)
-                    else:
-                        st.info("Aucune donnée de date de dernier logon valide après filtrage ou la somme des utilisateurs est zéro pour les utilisateurs inactifs.")
+                if not users_no_logon_date.empty:
+                    st.warning(f"🚨 **{len(users_no_logon_date)}** utilisateurs n'ont pas de date de dernier logon enregistrée ('00000000').")
+                    # Afficher les colonnes pertinentes, triées par BNAME pour la lisibilité
+                    st.dataframe(users_no_logon_date[['BNAME', 'GLTGB_DATE', 'USTYP']].sort_values(by='BNAME'))
                 else:
-                    st.info("Aucun utilisateur inactif détecté selon le seuil défini.")
+                    st.success("✅ Aucun utilisateur trouvé avec une date de dernier logon non enregistrée ('00000000').")
             else:
-                st.info("Colonne 'GLTGB_DATE' manquante ou ne contient pas de dates valides après filtrage pour la détection d'utilisateurs inactifs.")
+                st.info("La colonne 'GLTGB_DATE' est manquante ou ne contient pas de dates valides dans le DataFrame 'usr02'. Impossible d'analyser les utilisateurs sans date de logon.")
+
 
             st.subheader("Aperçu des Données Utilisateurs Filtrées")
             st.dataframe(df_usr02.head())
         else:
             st.warning("Données utilisateurs (USR02) non disponibles ou filtrées à vide.")
 
+
+    
     elif st.session_state.current_section == "Détection d'Anomalies":
         st.header("🚨 Détection d'Anomalies")
         st.write("Cette section est dédiée à l'analyse et la détection des anomalies dans vos données SAP.")
+        if 'selected_accounts' not in locals() and 'selected_accounts' not in globals():
+            selected_accounts = []
+        if 'selected_reports' not in locals() and 'selected_reports' not in globals():
+            selected_reports = []
+        if 'selected_tasktypes' not in locals() and 'selected_tasktypes' not in globals():
+            selected_tasktypes = []
 
         if not dfs['hitlist_db'].empty and 'RESPTI' in dfs['hitlist_db'].columns and 'FULL_DATETIME' in dfs['hitlist_db'].columns:
             df_respti = dfs['hitlist_db'].copy()
@@ -1600,6 +1669,216 @@ else:
         
         st.markdown("---")
 
+    elif st.session_state.current_section == "Prédiction de Performance (ML)":
+        st.header("🔮 Prédiction du Temps de Réponse (RESPTI)")
+        st.write("Cette section utilise un modèle de Machine Learning pour prédire le temps de réponse (RESPTI) des transactions SAP.")
+
+        df_hitlist_ml = dfs.get("hitlist_db", pd.DataFrame())
+
+        if df_hitlist_ml.empty or 'RESPTI' not in df_hitlist_ml.columns or 'FULL_DATETIME' not in df_hitlist_ml.columns:
+            st.info("Données 'hitlist_db' non disponibles ou les colonnes nécessaires (RESPTI, FULL_DATETIME) sont manquantes. Impossible d'effectuer la prédiction.")
+        else:
+            df_ml_data = df_hitlist_ml.copy()
+            df_ml_data['RESPTI'] = pd.to_numeric(df_ml_data['RESPTI'], errors='coerce')
+            df_ml_data = df_ml_data.dropna(subset=['RESPTI', 'FULL_DATETIME'])
+
+            if df_ml_data.empty or df_ml_data['RESPTI'].sum() == 0:
+                st.info("Pas de données valides pour la prédiction de RESPTI après nettoyage.")
+            else:
+                df_ml_data['RESPTI_transformed'] = np.log1p(df_ml_data['RESPTI'].clip(lower=0))
+                df_ml_data['hour_of_day'] = df_ml_data['FULL_DATETIME'].dt.hour
+                df_ml_data['day_of_week'] = df_ml_data['FULL_DATETIME'].dt.dayofweek # Lundi=0, Dimanche=6
+
+
+                numerical_features = [
+                    'CPUTI', 'PROCTI', 'QUEUETI', 'ROLLWAITTI', 'GUITIME', 'GUICNT', 'GUINETTIME',
+                    'DBP_COUNT', 'DBP_TIME', 'DSQLCNT', 'QUECNT', 'CPICCNT', 'SLI_CNT',
+                    'READDIRTI', 'READDIRBUF', 'READDIRREC', 'READSEQTI',
+                    'READSEQBUF', 'READSEQREC', 'INSCNT', 'INSTI', 'INSREC', 'PHYINSCNT',
+                    'UPDCNT', 'UPDTI', 'UPDREC', 'PHYUPDCNT', 'DELCNT', 'DELTI', 'DELREC', 'PHYDELCNT',
+                    'DBCALLS', 'COMMITTI', 'INPUTLEN', 'OUTPUTLEN', 'MAXROLL', 'MAXPAGE', 'ROLLINCNT',
+                    'ROLLINTI', 'ROLLOUTCNT', 'ROLLOUTTI', 'PRIVSUM', 'USEDBYTES', 'MAXBYTES', 'MAXBYTESDI',
+                    'RFCRECEIVE', 'RFCSEND', 'RFCEXETIME', 'RFCCALLTIM', 'RFCCALLS', 'VMC_CALL_COUNT',
+                    'VMC_CPU_TIME', 'VMC_ELAP_TIME'
+                ]
+                categorical_features = ['ACCOUNT', 'REPORT']
+
+                features_to_use = []
+                for col in numerical_features:
+                    if col in df_ml_data.columns:
+                        df_ml_data[col] = pd.to_numeric(df_ml_data[col], errors='coerce').fillna(0)
+                        features_to_use.append(col)
+                for col in categorical_features:
+                    if col in df_ml_data.columns:
+                        df_ml_data[col] = clean_string_column(df_ml_data[col])
+                        features_to_use.append(col)
+
+                features_to_use.extend(['hour_of_day', 'day_of_week'])
+                features_to_use = [f for f in features_to_use if f in df_ml_data.columns]
+
+                X = df_ml_data[features_to_use]
+                y = df_ml_data['RESPTI_transformed']
+
+                if X.empty or y.empty:
+                    st.info("Pas de données suffisantes pour entraîner le modèle après la sélection des caractéristiques.")
+                elif len(X) < 2:
+                    st.info("Pas assez de lignes de données pour entraîner le modèle (au moins 2 lignes nécessaires).")
+                else:
+                    numeric_transformer = Pipeline(steps=[
+                        ('imputer', SimpleImputer(strategy='mean'))
+                    ])
+                    categorical_transformer = Pipeline(steps=[
+                        ('onehot', OneHotEncoder(handle_unknown='ignore'))
+                    ])
+                    preprocessor = ColumnTransformer(
+                        transformers=[
+                            ('num', numeric_transformer, [f for f in features_to_use if f in numerical_features]),
+                            ('cat', categorical_transformer, [f for f in features_to_use if f in categorical_features])
+                        ],
+                        remainder='passthrough'
+                    )
+                    model_pipeline = Pipeline(steps=[
+                        ('preprocessor', preprocessor),
+                        ('regressor', RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1))
+                    ])
+
+                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+                    with st.spinner("Entraînement du modèle de prédiction de temps de réponse..."):
+                        try:
+                            model_pipeline.fit(X_train, y_train)
+                            st.success("Modèle entraîné avec succès !")
+
+                            y_pred = model_pipeline.predict(X_test)
+                            r2 = r2_score(y_test, y_pred)
+                            mae = mean_absolute_error(y_test, y_pred)
+
+                            st.subheader("Performance du Modèle")
+                            st.write(f"**Score R² (Coefficient de Détermination) :** `{r2:.4f}`")
+                            st.write(f"**MAE (Erreur Absolue Moyenne) :** `{mae:.2f} ms`")
+                            st.info("Un R² proche de 1 indique un bon ajustement du modèle. Un MAE faible indique que les prédictions sont proches des valeurs réelles.")
+
+                            st.subheader("Importance des Caractéristiques")
+                            regressor = model_pipeline.named_steps['regressor']
+                            processed_feature_names = model_pipeline.named_steps['preprocessor'].get_feature_names_out()
+                            feature_importances = pd.DataFrame({
+                                'Feature': processed_feature_names,
+                                'Importance': regressor.feature_importances_
+                            }).sort_values(by='Importance', ascending=False)
+                            st.dataframe(feature_importances.head(10))
+
+                            st.subheader("Prédictions vs. Réel (Échantillon)")
+                            df_results = pd.DataFrame({'Réel': y_test, 'Prédit': y_pred})
+                            fig_pred_vs_real = px.scatter(df_results.sample(min(500, len(df_results)), random_state=42),
+                                                        x='Réel', y='Prédit',
+                                                        title='Prédictions du Modèle vs. Valeurs Réelles',
+                                                        labels={'Réel': 'Temps de Réponse Réel (ms)', 'Prédit': 'Temps de Réponse Prédit (ms)'})
+                            fig_pred_vs_real.add_trace(px.line(x=[min(y_test), max(y_test)], y=[min(y_test), max(y_test)],
+                                                        color_discrete_sequence=['red']).data[0])
+                            st.plotly_chart(fig_pred_vs_real, use_container_width=True)
+
+                        except Exception as e:
+                            st.error(f"Une erreur est survenue lors de l'entraînement du modèle: {e}") # <--- AJOUTEZ CETTE LIGNE (indented 4 spaces)
+                        else:
+                    st.info("Le modèle a déjà été entraîné. Vous pouvez faire des prédictions ci-dessous.")
+                    st.subheader("Performance du Modèle (déjà entraîné)")
+                    # Ré-afficher les métriques si le modèle est déjà entraîné
+                    # (Vous pourriez stocker r2 et mae en session_state aussi si vous voulez les ré-afficher sans re-calcul)
+                    st.write("Le modèle est prêt pour la prédiction.")
+
+                # --- Interface de Prédiction Interactive ---
+                if 'model_pipeline' in st.session_state:
+                    st.subheader("Faire une Prédiction")
+                    st.markdown("Entrez les valeurs des métriques pour obtenir une prédiction du temps de réponse (RESPTI).")
+
+                    # Créer des champs de saisie pour chaque caractéristique
+                    input_data = {}
+                    
+                    # Récupérer les moyennes pour les valeurs par défaut
+                    df_stats = df_ml_data[st.session_state.numerical_features].mean().to_dict()
+
+                    # Champs pour les caractéristiques numériques
+                    cols = st.columns(3)
+                    col_idx = 0
+                    for feature in st.session_state.numerical_features:
+                        with cols[col_idx % 3]:
+                            default_value = df_stats.get(feature, 0.0)
+                            input_data[feature] = st.number_input(
+                                f"{feature} (ms/count)",
+                                value=float(default_value),
+                                format="%.2f",
+                                key=f"input_{feature}"
+                            )
+                        col_idx += 1
+
+                    # Champs pour les caractéristiques catégorielles
+                    cols = st.columns(2)
+                    col_idx = 0
+                    if 'ACCOUNT' in st.session_state.categorical_features and st.session_state.unique_accounts:
+                        with cols[col_idx % 2]:
+                            input_data['ACCOUNT'] = st.selectbox(
+                                "Compte (ACCOUNT)",
+                                options=st.session_state.unique_accounts,
+                                key="input_account"
+                            )
+                        col_idx += 1
+                    
+                    if 'REPORT' in st.session_state.categorical_features and st.session_state.unique_reports:
+                        with cols[col_idx % 2]:
+                            input_data['REPORT'] = st.selectbox(
+                                "Rapport (REPORT)",
+                                options=st.session_state.unique_reports,
+                                key="input_report"
+                            )
+                        col_idx += 1
+
+                    # Champs pour les caractéristiques temporelles
+                    cols = st.columns(2)
+                    with cols[0]:
+                        input_data['hour_of_day'] = st.slider(
+                            "Heure de la journée (0-23)",
+                            min_value=0, max_value=23, value=12, step=1,
+                            key="input_hour_of_day"
+                        )
+                    with cols[1]:
+                        input_data['day_of_week'] = st.slider(
+                            "Jour de la semaine (0=Lundi, 6=Dimanche)",
+                            min_value=0, max_value=6, value=0, step=1,
+                            key="input_day_of_week"
+                        )
+
+                    # Bouton de prédiction
+                    if st.button("Prédire le Temps de Réponse"):
+                        try:
+                            # Créer un DataFrame à partir des entrées utilisateur
+                            # Assurez-vous que l'ordre des colonnes est le même que X_train
+                            input_df = pd.DataFrame([input_data])
+                            
+                            # S'assurer que toutes les colonnes attendues par le modèle sont présentes,
+                            # même si elles n'ont pas été affichées comme input (remplir avec 0 ou moyenne)
+                            # C'est important pour le preprocessor.
+                            for col in st.session_state.numerical_features:
+                                if col not in input_df.columns:
+                                    input_df[col] = df_stats.get(col, 0.0) # Utiliser la moyenne du training set
+                            for col in st.session_state.categorical_features:
+                                if col not in input_df.columns:
+                                    input_df[col] = "Non défini" # Ou la catégorie la plus fréquente
+                            
+                            # S'assurer que l'ordre des colonnes est correct
+                            input_df = input_df[st.session_state.features_to_use]
+
+                            # Effectuer la prédiction
+                            predicted_log_respti = st.session_state.model_pipeline.predict(input_df)
+                            predicted_respti = np.expm1(predicted_log_respti[0]) # Inverse la transformation
+
+                            st.success(f"Le temps de réponse (RESPTI) prédit est de : **{predicted_respti:.2f} ms**")
+
+                        except Exception as e:
+                            st.error(f"Erreur lors de la prédiction : {e}")
+                            st.info("Veuillez vérifier les valeurs saisies.")
+                else:
+                    st.info("Le modèle n'est pas encore entraîné ou n'a pas pu être chargé. Veuillez recharger la page ou vérifier les données.")
+
 
 # Option pour afficher tous les DataFrames (utile pour le débogage)
 with st.expander("🔍 Afficher tous les DataFrames chargés (pour débogage)"):
@@ -1611,5 +1890,3 @@ with st.expander("🔍 Afficher tous les DataFrames chargés (pour débogage)"):
             buffer = io.StringIO()
             df.info(buf=buffer)
             st.text(buffer.getvalue())
-            st.write(f"...")
-            st.write(f"...")
