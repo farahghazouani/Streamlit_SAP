@@ -1576,7 +1576,7 @@ La "longue queue" vers des valeurs AVGTPERREC plus élevées indique qu'il exist
 
     elif st.session_state.current_section == "Détection d'Anomalies":
         st.header("🚨 Détection d'Anomalies")
-        st.write("Cette section est dédiée à l'analyse et la détection des anomalies dans vos données SAP.")
+        st.write("Cette section est dédiée à l'analyse et la détection des anomalies.")
         if 'selected_accounts' not in locals() and 'selected_accounts' not in globals():
             selected_accounts = []
         if 'selected_reports' not in locals() and 'selected_reports' not in globals():
