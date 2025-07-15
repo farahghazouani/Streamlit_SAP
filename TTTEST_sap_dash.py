@@ -1403,31 +1403,6 @@ Ce graphique à barres présente le temps CPU moyen consommé par chaque type de
             else:
                 st.info("Colonnes 'SQLSTATEM' ou 'EXECTIME' manquantes ou leur total est zéro/vide après filtrage.")
 
-            st.subheader("Top 10 Requêtes SQL par Nombre Total d'Exécutions (TOTALEXEC)")
-            st.markdown("""
-                Ce graphique met en évidence les 10 requêtes SQL les plus fréquemment exécutées.
-                Il est utile pour identifier les requêtes qui, même si elles ne sont pas individuellement lentes,
-                peuvent avoir un impact significatif sur la performance globale en raison de leur volume d'exécution élevé.
-                """)
-            if 'SQLSTATEM' in df_sql_trace.columns and 'TOTALEXEC' in df_sql_trace.columns and df_sql_trace['TOTALEXEC'].sum() > 0:
-                # Ensure TOTALEXEC is numeric here
-                df_sql_trace['TOTALEXEC'] = pd.to_numeric(df_sql_trace['TOTALEXEC'], errors='coerce').fillna(0).astype(float)
-                top_sql_by_totalexec = df_sql_trace.groupby('SQLSTATEM', as_index=False)['TOTALEXEC'].sum().nlargest(10, 'TOTALEXEC')
-                top_sql_by_totalexec['SQLSTATEM_SHORT'] = top_sql_by_totalexec['SQLSTATEM'].apply(lambda x: x[:70] + '...' if len(x) > 70 else x)
-                if not top_sql_by_totalexec.empty and top_sql_by_totalexec['TOTALEXEC'].sum() > 0:
-                    fig_top_sql_totalexec = px.bar(top_sql_by_totalexec, y='SQLSTATEM_SHORT', x='TOTALEXEC', orientation='h',
-                                                    title="Top 10 Requêtes SQL par Nombre Total d'Exécutions",
-                                                    labels={'SQLSTATEM_SHORT': 'Instruction SQL', 'TOTALEXEC': 'Nombre Total d\'Exécutions'},
-                                                    color='TOTALEXEC', color_continuous_scale=px.colors.sequential.Greens)
-                    fig_top_sql_totalexec.update_yaxes(autorange="reversed")
-                    st.plotly_chart(fig_top_sql_totalexec, use_container_width=True)
-                else:
-                    st.info("Pas de données valides pour les Top 10 Requêtes SQL par Nombre Total d'Exécutions après filtrage.")
-            else:
-                st.info("Colonnes 'SQLSTATEM' ou 'TOTALEXEC' manquantes ou leur total est zéro/vide après filtrage.")
-
-
-
             st.subheader("Distribution du Temps Moyen par Enregistrement (AVGTPERREC : Average Processing Time per Database Record values) pour le serveur 'ECC-VE7-00'")
             st.markdown("""
                 Cette courbe de densité montre la répartition du temps moyen par enregistrement spécifiquement pour le serveur "ECC-VE7-00".
