@@ -1669,224 +1669,130 @@ La "longue queue" vers des valeurs AVGTPERREC plus élevées indique qu'il exist
         
         st.markdown("---")
 
-    elif st.session_state.current_section == "Prédiction de Performance (ML)":
-        st.header("🔮 Prédiction du Temps de Réponse (RESPTI)")
-        st.write("Cette section utilise un modèle de Machine Learning pour prédire le temps de réponse (RESPTI) des transactions SAP.")
+elif st.session_state.current_section == "Prédiction de Performance (ML)":
+    st.header("🧠 Prédiction de Performance (Machine Learning)")
+    st.write("""
+        Cette section utilise un modèle de Machine Learning simple (Random Forest Regressor) pour prédire une métrique de performance.
+        **Note :** Pour une prédiction significative, des données plus complètes et un ingénierie de fonctionnalités avancée seraient nécessaires.
+        Ceci est un exemple démonstratif.
+        """)
 
-        df_hitlist_ml = dfs.get("hitlist_db", pd.DataFrame())
+    # Sélection de la cible de prédiction
+    ml_data_source = st.selectbox(
+        "Sélectionnez la source de données pour la prédiction:",
+        ["Hitlist DB", "User Tcode"]
+    )
 
-        if df_hitlist_ml.empty or 'RESPTI' not in df_hitlist_ml.columns or 'FULL_DATETIME' not in df_hitlist_ml.columns:
-            st.info("Données 'hitlist_db' non disponibles ou les colonnes nécessaires (RESPTI, FULL_DATETIME) sont manquantes. Impossible d'effectuer la prédiction.")
+    df_ml = pd.DataFrame()
+    target_ml_column = None
+    features_ml = []
+
+    if ml_data_source == "Hitlist DB":
+        df_ml = dfs.get("hitlist_db", pd.DataFrame())
+        target_ml_column = 'RESPTI'
+        features_ml = ['PROCTI', 'CPUTI', 'DBCALLS', 'PHYREADCNT'] # Exemples de features
+        categorical_features_ml = ['ACCOUNT', 'REPORT', 'WPID'] # Exemples de features catégorielles
+        st.write(f"Prédiction de la colonne **{target_ml_column}** à partir de `Hitlist DB`.")
+    elif ml_data_source == "User Tcode":
+        df_ml = dfs.get("usertcode", pd.DataFrame())
+        target_ml_column = 'RESPTI'
+        features_ml = ['COUNT', 'PROCTI', 'CPUTI', 'DBP_COUNT'] # Exemples de features
+        categorical_features_ml = ['ACCOUNT', 'ENTRY_ID'] # Exemples de features catégorielles
+        st.write(f"Prédiction de la colonne **{target_ml_column}** à partir de `User Tcode`.")
+
+    # Vérifier si les données et les colonnes nécessaires sont présentes
+    required_cols = [target_ml_column] + features_ml + categorical_features_ml
+    if df_ml.empty or not all(col in df_ml.columns for col in required_cols):
+        missing_cols = [col for col in required_cols if col not in df_ml.columns]
+        st.warning(f"Données ou colonnes requises manquantes pour la prédiction ML depuis {ml_data_source}. Colonnes manquantes: {', '.join(missing_cols)}")
+    else:
+        # Préparation des données pour le modèle
+        df_model = df_ml[required_cols].copy()
+        
+        # Convertir les colonnes numériques en float et gérer les NaN
+        for col in features_ml + [target_ml_column]:
+            df_model[col] = pd.to_numeric(df_model[col], errors='coerce')
+        
+        # Supprimer les lignes avec NaN dans la cible et les features numériques
+        df_model.dropna(subset=[target_ml_column] + features_ml, inplace=True)
+        
+        if df_model.empty:
+            st.info("Aucune donnée valide pour l'entraînement du modèle après nettoyage.")
         else:
-            df_ml_data = df_hitlist_ml.copy()
-            df_ml_data['RESPTI'] = pd.to_numeric(df_ml_data['RESPTI'], errors='coerce')
-            df_ml_data = df_ml_data.dropna(subset=['RESPTI', 'FULL_DATETIME'])
+            X = df_model[features_ml + categorical_features_ml]
+            y = df_model[target_ml_column]
 
-            if df_ml_data.empty or df_ml_data['RESPTI'].sum() == 0:
-                st.info("Pas de données valides pour la prédiction de RESPTI après nettoyage.")
-            else:
-                df_ml_data['RESPTI_transformed'] = np.log1p(df_ml_data['RESPTI'].clip(lower=0))
-                df_ml_data['hour_of_day'] = df_ml_data['FULL_DATETIME'].dt.hour
-                df_ml_data['day_of_week'] = df_ml_data['FULL_DATETIME'].dt.dayofweek # Lundi=0, Dimanche=6
+            # Séparer les données en ensembles d'entraînement et de test
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+            # Créer un pipeline de prétraitement pour les caractéristiques numériques et catégorielles
+            numeric_features = features_ml
+            categorical_features = [col for col in categorical_features_ml if col in X.columns] # S'assurer que la colonne existe
 
-                numerical_features = [
-                    'CPUTI', 'PROCTI', 'QUEUETI', 'ROLLWAITTI', 'GUITIME', 'GUICNT', 'GUINETTIME',
-                    'DBP_COUNT', 'DBP_TIME', 'DSQLCNT', 'QUECNT', 'CPICCNT', 'SLI_CNT',
-                    'READDIRTI', 'READDIRBUF', 'READDIRREC', 'READSEQTI',
-                    'READSEQBUF', 'READSEQREC', 'INSCNT', 'INSTI', 'INSREC', 'PHYINSCNT',
-                    'UPDCNT', 'UPDTI', 'UPDREC', 'PHYUPDCNT', 'DELCNT', 'DELTI', 'DELREC', 'PHYDELCNT',
-                    'DBCALLS', 'COMMITTI', 'INPUTLEN', 'OUTPUTLEN', 'MAXROLL', 'MAXPAGE', 'ROLLINCNT',
-                    'ROLLINTI', 'ROLLOUTCNT', 'ROLLOUTTI', 'PRIVSUM', 'USEDBYTES', 'MAXBYTES', 'MAXBYTESDI',
-                    'RFCRECEIVE', 'RFCSEND', 'RFCEXETIME', 'RFCCALLTIM', 'RFCCALLS', 'VMC_CALL_COUNT',
-                    'VMC_CPU_TIME', 'VMC_ELAP_TIME'
-                ]
-                categorical_features = ['ACCOUNT', 'REPORT']
+            numeric_transformer = Pipeline(steps=[
+                ('imputer', SimpleImputer(strategy='mean')), # Impute NaN avec la moyenne
+                # ('scaler', StandardScaler()) # Non nécessaire pour Random Forest, mais utile pour d'autres modèles
+            ])
 
-                features_to_use = []
-                for col in numerical_features:
-                    if col in df_ml_data.columns:
-                        df_ml_data[col] = pd.to_numeric(df_ml_data[col], errors='coerce').fillna(0)
-                        features_to_use.append(col)
-                for col in categorical_features:
-                    if col in df_ml_data.columns:
-                        df_ml_data[col] = clean_string_column(df_ml_data[col])
-                        features_to_use.append(col)
+            categorical_transformer = Pipeline(steps=[
+                ('imputer', SimpleImputer(strategy='constant', fill_value='missing')), # Impute NaN avec 'missing'
+                ('onehot', OneHotEncoder(handle_unknown='ignore'))
+            ])
 
-                features_to_use.extend(['hour_of_day', 'day_of_week'])
-                features_to_use = [f for f in features_to_use if f in df_ml_data.columns]
+            preprocessor = ColumnTransformer(
+                transformers=[
+                    ('num', numeric_transformer, numeric_features),
+                    ('cat', categorical_transformer, categorical_features)
+                ])
 
-                X = df_ml_data[features_to_use]
-                y = df_ml_data['RESPTI_transformed']
+            # Créer le pipeline du modèle
+            model_pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+                                            ('regressor', RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1))])
 
-                if X.empty or y.empty:
-                    st.info("Pas de données suffisantes pour entraîner le modèle après la sélection des caractéristiques.")
-                elif len(X) < 2:
-                    st.info("Pas assez de lignes de données pour entraîner le modèle (au moins 2 lignes nécessaires).")
-                else:
-                    numeric_transformer = Pipeline(steps=[
-                        ('imputer', SimpleImputer(strategy='mean'))
-                    ])
-                    categorical_transformer = Pipeline(steps=[
-                        ('onehot', OneHotEncoder(handle_unknown='ignore'))
-                    ])
-                    preprocessor = ColumnTransformer(
-                        transformers=[
-                            ('num', numeric_transformer, [f for f in features_to_use if f in numerical_features]),
-                            ('cat', categorical_transformer, [f for f in features_to_use if f in categorical_features])
-                        ],
-                        remainder='passthrough'
-                    )
-                    model_pipeline = Pipeline(steps=[
-                        ('preprocessor', preprocessor),
-                        ('regressor', RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1))
-                    ])
+            # Entraîner le modèle
+            st.write("Entraînement du modèle de régression Random Forest...")
+            try:
+                model_pipeline.fit(X_train, y_train)
+                st.success("Modèle entraîné avec succès!")
 
-                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                # Faire des prédictions
+                y_pred = model_pipeline.predict(X_test)
 
-                    with st.spinner("Entraînement du modèle de prédiction de temps de réponse..."):
-                        try:
-                            model_pipeline.fit(X_train, y_train)
-                            st.success("Modèle entraîné avec succès !")
+                # Évaluer le modèle
+                r2 = r2_score(y_test, y_pred)
+                mae = mean_absolute_error(y_test, y_pred)
 
-                            y_pred = model_pipeline.predict(X_test)
-                            r2 = r2_score(y_test, y_pred)
-                            mae = mean_absolute_error(y_test, y_pred)
+                st.subheader("Performance du Modèle")
+                st.write(f"**R² Score :** `{r2:.3f}` (Plus proche de 1, meilleur est l'ajustement)")
+                st.write(f"**Erreur Absolue Moyenne (MAE) :** `{mae:.2f}`")
 
-                            st.subheader("Performance du Modèle")
-                            st.write(f"**Score R² (Coefficient de Détermination) :** `{r2:.4f}`")
-                            st.write(f"**MAE (Erreur Absolue Moyenne) :** `{mae:.2f} ms`")
-                            st.info("Un R² proche de 1 indique un bon ajustement du modèle. Un MAE faible indique que les prédictions sont proches des valeurs réelles.")
+                # Visualisation des prédictions vs. valeurs réelles
+                df_results = pd.DataFrame({'Valeurs Réelles': y_test, 'Prédictions': y_pred})
+                fig_pred = px.scatter(df_results.sample(min(500, len(df_results)), random_state=42), # Échantillon pour la visibilité
+                                    x='Valeurs Réelles', y='Prédictions',
+                                    title=f"Prédictions vs. Valeurs Réelles pour {target_ml_column}",
+                                    labels={'Valeurs Réelles': f'Valeurs Réelles de {target_ml_column}', 'Prédictions': f'Prédictions de {target_ml_column}'},
+                                    trendline='ols', # Ligne de régression linéaire
+                                    opacity=0.6)
+                fig_pred.update_traces(marker_size=5)
+                st.plotly_chart(fig_pred, use_container_width=True)
 
-                            st.subheader("Importance des Caractéristiques")
-                            regressor = model_pipeline.named_steps['regressor']
-                            processed_feature_names = model_pipeline.named_steps['preprocessor'].get_feature_names_out()
-                            feature_importances = pd.DataFrame({
-                                'Feature': processed_feature_names,
-                                'Importance': regressor.feature_importances_
-                            }).sort_values(by='Importance', ascending=False)
-                            st.dataframe(feature_importances.head(10))
+                st.write("""
+                    Un bon modèle aura des points groupés près de la ligne diagonale (où les prédictions égalent les valeurs réelles).
+                    """)
+            except Exception as e:
+                st.error(f"Erreur lors de l'entraînement ou de l'évaluation du modèle : {e}")
 
-                            st.subheader("Prédictions vs. Réel (Échantillon)")
-                            df_results = pd.DataFrame({'Réel': y_test, 'Prédit': y_pred})
-                            fig_pred_vs_real = px.scatter(df_results.sample(min(500, len(df_results)), random_state=42),
-                                                        x='Réel', y='Prédit',
-                                                        title='Prédictions du Modèle vs. Valeurs Réelles',
-                                                        labels={'Réel': 'Temps de Réponse Réel (ms)', 'Prédit': 'Temps de Réponse Prédit (ms)'})
-                            fig_pred_vs_real.add_trace(px.line(x=[min(y_test), max(y_test)], y=[min(y_test), max(y_test)],
-                                                        color_discrete_sequence=['red']).data[0])
-                            st.plotly_chart(fig_pred_vs_real, use_container_width=True)
+# --- Téléchargement du script ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("Télécharger le Script")
+script_code = io.StringIO()
+with open(__file__, "r", encoding="utf-8") as f:
+    script_code.write(f.read())
+st.sidebar.download_button(
+    label="Télécharger le script Python",
+    data=script_code.getvalue(),
+    file_name="sap_dashboard_app.py",
+    mime="text/plain"
+)
 
-                        except Exception as e:
-                            st.error(f"Une erreur est survenue lors de l'entraînement du modèle: {e}") # <--- AJOUTEZ CETTE LIGNE (indented 4 spaces)
-                        else:
-                    st.info("Le modèle a déjà été entraîné. Vous pouvez faire des prédictions ci-dessous.")
-                    st.subheader("Performance du Modèle (déjà entraîné)")
-                    # Ré-afficher les métriques si le modèle est déjà entraîné
-                    # (Vous pourriez stocker r2 et mae en session_state aussi si vous voulez les ré-afficher sans re-calcul)
-                    st.write("Le modèle est prêt pour la prédiction.")
-
-                # --- Interface de Prédiction Interactive ---
-                if 'model_pipeline' in st.session_state:
-                    st.subheader("Faire une Prédiction")
-                    st.markdown("Entrez les valeurs des métriques pour obtenir une prédiction du temps de réponse (RESPTI).")
-
-                    # Créer des champs de saisie pour chaque caractéristique
-                    input_data = {}
-                    
-                    # Récupérer les moyennes pour les valeurs par défaut
-                    df_stats = df_ml_data[st.session_state.numerical_features].mean().to_dict()
-
-                    # Champs pour les caractéristiques numériques
-                    cols = st.columns(3)
-                    col_idx = 0
-                    for feature in st.session_state.numerical_features:
-                        with cols[col_idx % 3]:
-                            default_value = df_stats.get(feature, 0.0)
-                            input_data[feature] = st.number_input(
-                                f"{feature} (ms/count)",
-                                value=float(default_value),
-                                format="%.2f",
-                                key=f"input_{feature}"
-                            )
-                        col_idx += 1
-
-                    # Champs pour les caractéristiques catégorielles
-                    cols = st.columns(2)
-                    col_idx = 0
-                    if 'ACCOUNT' in st.session_state.categorical_features and st.session_state.unique_accounts:
-                        with cols[col_idx % 2]:
-                            input_data['ACCOUNT'] = st.selectbox(
-                                "Compte (ACCOUNT)",
-                                options=st.session_state.unique_accounts,
-                                key="input_account"
-                            )
-                        col_idx += 1
-                    
-                    if 'REPORT' in st.session_state.categorical_features and st.session_state.unique_reports:
-                        with cols[col_idx % 2]:
-                            input_data['REPORT'] = st.selectbox(
-                                "Rapport (REPORT)",
-                                options=st.session_state.unique_reports,
-                                key="input_report"
-                            )
-                        col_idx += 1
-
-                    # Champs pour les caractéristiques temporelles
-                    cols = st.columns(2)
-                    with cols[0]:
-                        input_data['hour_of_day'] = st.slider(
-                            "Heure de la journée (0-23)",
-                            min_value=0, max_value=23, value=12, step=1,
-                            key="input_hour_of_day"
-                        )
-                    with cols[1]:
-                        input_data['day_of_week'] = st.slider(
-                            "Jour de la semaine (0=Lundi, 6=Dimanche)",
-                            min_value=0, max_value=6, value=0, step=1,
-                            key="input_day_of_week"
-                        )
-
-                    # Bouton de prédiction
-                    if st.button("Prédire le Temps de Réponse"):
-                        try:
-                            # Créer un DataFrame à partir des entrées utilisateur
-                            # Assurez-vous que l'ordre des colonnes est le même que X_train
-                            input_df = pd.DataFrame([input_data])
-                            
-                            # S'assurer que toutes les colonnes attendues par le modèle sont présentes,
-                            # même si elles n'ont pas été affichées comme input (remplir avec 0 ou moyenne)
-                            # C'est important pour le preprocessor.
-                            for col in st.session_state.numerical_features:
-                                if col not in input_df.columns:
-                                    input_df[col] = df_stats.get(col, 0.0) # Utiliser la moyenne du training set
-                            for col in st.session_state.categorical_features:
-                                if col not in input_df.columns:
-                                    input_df[col] = "Non défini" # Ou la catégorie la plus fréquente
-                            
-                            # S'assurer que l'ordre des colonnes est correct
-                            input_df = input_df[st.session_state.features_to_use]
-
-                            # Effectuer la prédiction
-                            predicted_log_respti = st.session_state.model_pipeline.predict(input_df)
-                            predicted_respti = np.expm1(predicted_log_respti[0]) # Inverse la transformation
-
-                            st.success(f"Le temps de réponse (RESPTI) prédit est de : **{predicted_respti:.2f} ms**")
-
-                        except Exception as e:
-                            st.error(f"Erreur lors de la prédiction : {e}")
-                            st.info("Veuillez vérifier les valeurs saisies.")
-                else:
-                    st.info("Le modèle n'est pas encore entraîné ou n'a pas pu être chargé. Veuillez recharger la page ou vérifier les données.")
-
-
-# Option pour afficher tous les DataFrames (utile pour le débogage)
-with st.expander("🔍 Afficher tous les DataFrames chargés (pour débogage)"):
-    for key, df in dfs.items():
-        st.subheader(f"DataFrame: {key} (Taille: {len(df)} lignes)")
-        st.dataframe(df.head())
-        # Mise à jour de la checkbox avec une clé unique et un label plus clair
-        if st.checkbox(f"Afficher les informations de '{key}' (df.info())", key=f"info_{key}"):
-            buffer = io.StringIO()
-            df.info(buf=buffer)
-            st.text(buffer.getvalue())
