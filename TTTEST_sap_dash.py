@@ -383,7 +383,7 @@ tab_titles = [
     "Transactions Utilisateurs",
     "Statistiques Horaires",
     "Insights Hitlist DB",
-    "Performance des Processus de Travail",
+    "Performance des Work Process",
     "Résumé des Traces de Performance SQL",
     "Analyse des Utilisateurs",
     "Détection d'Anomalies"
@@ -1285,7 +1285,7 @@ Cette visualisation est essentielle pour identifier les rapports qui génèrent 
         else:
             st.warning("Données Hitlist DB non disponibles ou filtrées à vide.")
 
-    elif st.session_state.current_section == "Performance des Processus de Travail":
+    elif st.session_state.current_section == "Performance des Work Process":
         # --- Onglet 6: Performance des Processus de Travail (AL_GET_PERFORMANCE) ---
         st.header("⚡ Performance des Work Process")
         df_perf = dfs['performance'].copy()
