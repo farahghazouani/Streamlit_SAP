@@ -1669,3 +1669,16 @@ with st.expander("🔍 Afficher tous les DataFrames chargés (pour débogage)"):
             buffer = io.StringIO()
             df.info(buf=buffer)
             st.text(buffer.getvalue())
+
+# --- Téléchargement du script ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("Télécharger le Script")
+script_code = io.StringIO()
+with open(__file__, "r", encoding="utf-8") as f:
+    script_code.write(f.read())
+st.sidebar.download_button(
+    label="Télécharger TTEST_dashboard_sap.py",
+    data=script_code.getvalue(),
+    file_name="TTEST_dashboard_sap.py",
+    mime="text/x-python"
+)
