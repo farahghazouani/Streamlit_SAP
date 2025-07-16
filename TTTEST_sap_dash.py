@@ -1259,7 +1259,7 @@ Cette visualisation est essentielle pour identifier les rapports qui génèrent 
             # New section: Top 10 Accounts by Total ROLLOUTCNT
             st.subheader("Top 10 Comptes par Nombre Total de 'Roll Outs' (ROLLOUTCNT)")
             st.markdown("""
-                Le 'roll-out' fait référence au processus où l'état d'un processus de travail est temporairement écrit sur le disque (dans la zone de roll ou de page)
+                Le 'roll-out' fait référence au processus où l'état d'un Work Process est temporairement écrit sur le disque (dans la zone de roll ou de page)
                 pour libérer de la mémoire pour d'autres processus. Un nombre élevé de 'roll-outs' peut indiquer une pression mémoire,
                 où le système manque de mémoire suffisante pour garder tous les contextes des utilisateurs en mémoire vive.
                 Cela peut avoir un impact négatif sur les performances.
@@ -1286,7 +1286,7 @@ Cette visualisation est essentielle pour identifier les rapports qui génèrent 
             st.warning("Données Hitlist DB non disponibles ou filtrées à vide.")
 
     elif st.session_state.current_section == "Performance des Work Process":
-        # --- Onglet 6: Performance des Processus de Travail (AL_GET_PERFORMANCE) ---
+        # --- Onglet 6: Performance des Work Process (AL_GET_PERFORMANCE) ---
         st.header("⚡ Performance des Work Process")
         df_perf = dfs['performance'].copy()
 
@@ -1297,7 +1297,7 @@ Cette visualisation est essentielle pour identifier les rapports qui génèrent 
                 st.warning("La colonne 'WP_TYP' est manquante dans les données de performance pour le filtrage.")
 
         if not df_perf.empty:
-            st.subheader("Distribution du Temps CPU des Processus de Travail (en secondes)")
+            st.subheader("Distribution du Temps CPU des Work Process (en secondes)")
             st.markdown("""
  Cette visualisation  aide à voir si le CPU est principalement utilisé par de nombreuses petites tâches rapides ou s'il est occasionnellement saturé par quelques opérations très lourdes          """)
             if 'WP_CPU_SECONDS' in df_perf.columns and df_perf['WP_CPU_SECONDS'].sum() > 0:
@@ -1307,7 +1307,7 @@ Cette visualisation est essentielle pour identifier les rapports qui génèrent 
                     fig_cpu_dist = ff.create_distplot([df_perf['WP_CPU_SECONDS'].dropna()], ['Temps CPU (s)'],
                                                       bin_size=df_perf['WP_CPU_SECONDS'].std()/5 if df_perf['WP_CPU_SECONDS'].std() > 0 else 1,
                                                       show_rug=False, show_hist=False)
-                    fig_cpu_dist.update_layout(title_text="Distribution du Temps CPU des Processus de Travail",
+                    fig_cpu_dist.update_layout(title_text="Distribution du Temps CPU des Work Process",
                                                xaxis_title='Temps CPU (secondes)',
                                                yaxis_title='Densité')
                     fig_cpu_dist.data[0].line.color = 'darkblue'
@@ -1317,11 +1317,11 @@ Cette visualisation est essentielle pour identifier les rapports qui génèrent 
             else:
                 st.info("Colonne 'WP_CPU_SECONDS' manquante ou total est zéro/vide après filtrage.")
             st.markdown("""
-L'observation la plus frappante est le pic très prononcé au début de la courbe, indiquant que la grande majorité des processus de travail SAP consomment très peu de temps CPU. Cela signifie que la plupart des opérations sont rapides et efficaces en termes d'utilisation du processeur.
+L'observation la plus frappante est le pic très prononcé au début de la courbe, indiquant que la grande majorité des Work Process SAP consomment très peu de temps CPU. Cela signifie que la plupart des opérations sont rapides et efficaces en termes d'utilisation du processeur.
             """)
 
 
-            st.subheader("Nombre de Processus de Travail par Type (WP_TYP)")
+            st.subheader("Nombre de Work Process par Type (WP_TYP)")
             st.markdown("""
 ce graphique est une "carte" des ressources de traitement du système SAP, essentielle pour s'assurer que le bon nombre de processus est disponible pour chaque type d'activité. 
             """)
@@ -1330,18 +1330,18 @@ ce graphique est une "carte" des ressources de traitement du système SAP, essen
                 type_counts.columns = ['Type', 'Count']
                 if not type_counts.empty and type_counts['Count'].sum() > 0:
                     fig_type_bar = px.bar(type_counts, x='Type', y='Count',
-                                            title="Nombre de Processus de Travail par Type",
+                                            title="Nombre de Work Process par Type",
                                             labels={'Type': 'Type de Processus', 'Count': 'Nombre'},
                                             color='Count', color_continuous_scale=px.colors.sequential.Viridis)
                     st.plotly_chart(fig_type_bar, use_container_width=True)
                 else:
-                    st.info("Pas de données valides pour le nombre de processus de travail par type après filtrage.")
+                    st.info("Pas de données valides pour le nombre de Work Process par type après filtrage.")
             else:
                 st.info("Colonne 'WP_TYP' manquante ou vide après filtrage.")
 
-            st.subheader("Temps CPU Moyen par Type de Processus de Travail (en secondes)")
+            st.subheader("Temps CPU Moyen par Type deWork Process (en secondes)")
             st.markdown("""
-Ce graphique à barres présente le temps CPU moyen consommé par chaque type de processus de travail SAP. Contrairement au graphique précédent qui montrait le nombre de processus, celui-ci indique leur intensité d'utilisation du processeur.
+Ce graphique à barres présente le temps CPU moyen consommé par chaque type de Work Process SAP. Contrairement au graphique précédent qui montrait le nombre de processus, celui-ci indique leur intensité d'utilisation du processeur.
             """)            
             if 'WP_TYP' in df_perf.columns and 'WP_CPU_SECONDS' in df_perf.columns and df_perf['WP_CPU_SECONDS'].sum() > 0:
                 # Ensure WP_CPU_SECONDS is numeric here
@@ -1352,7 +1352,7 @@ Ce graphique à barres présente le temps CPU moyen consommé par chaque type de
                 avg_cpu_by_type = avg_cpu_by_type.sort_values(by='WP_CPU_SECONDS', ascending=False)
                 if not avg_cpu_by_type.empty and avg_cpu_by_type['WP_CPU_SECONDS'].sum() > 0:
                     fig_avg_cpu_type = px.bar(avg_cpu_by_type, x='WP_TYP', y='WP_CPU_SECONDS',
-                                                title="Temps CPU Moyen par Type de Processus de Travail",
+                                                title="Temps CPU Moyen par Type de Work Process",
                                                 labels={'WP_TYP': 'Type de Processus', 'WP_CPU_SECONDS': 'Temps CPU Moyen (s)'},
                                                 color='WP_CPU_SECONDS', color_continuous_scale=px.colors.sequential.Plasma)
                     
@@ -1364,7 +1364,7 @@ Ce graphique à barres présente le temps CPU moyen consommé par chaque type de
                     
                     st.plotly_chart(fig_avg_cpu_type, use_container_width=True)
                 else:
-                    st.info("Pas de données valides pour le temps CPU moyen par type de processus de travail après filtrage.")
+                    st.info("Pas de données valides pour le temps CPU moyen par type de Work Process après filtrage.")
             else:
                 st.info("Colonnes 'WP_TYP' ou 'WP_CPU_SECONDS' manquantes ou total est zéro/vide après filtrage.")
 
